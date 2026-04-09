@@ -127,3 +127,12 @@ beeper-desktop-api-skill/
 ## Not affiliated with Beeper
 
 This is an unofficial, community-maintained skill. It documents Beeper's public Desktop API based on the official developer docs at https://developers.beeper.com/ but is not endorsed by or affiliated with Beeper / Automattic.
+
+## Author
+
+Maintained by **Gabe Fletcher**.
+
+- Twitter / X: [@gabefletcher](https://x.com/gabefletcher)
+- Substack: [Compounded Content](https://compoundedcontent.substack.com)
+
+If this skill saved you an hour of reading docs, a follow or a subscribe is the best way to say thanks.
