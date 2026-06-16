@@ -2,6 +2,15 @@
 
 Beeper Desktop ships a built-in Model Context Protocol (MCP) server so that agents — Claude Desktop, Claude Code, Cursor, VS Code, Raycast, Windsurf, Warp, Codex, Gemini CLI, etc. — can search, send, and manage Beeper messages through standard MCP tools.
 
+## Contents
+
+- [Endpoints](#endpoints)
+- [Supported clients (per official docs)](#supported-clients-per-official-docs)
+- [Authentication](#authentication)
+- [Prerequisites](#prerequisites)
+- [Per-client setup](#per-client-setup)
+- [Troubleshooting](#troubleshooting)
+
 ## Endpoints
 
 | Transport | URL | Notes |

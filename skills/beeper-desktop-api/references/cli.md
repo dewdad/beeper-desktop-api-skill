@@ -1,15 +1,30 @@
 # `@beeper/cli` — official Beeper CLI
 
-The Beeper team ships a first-class command-line tool that wraps the Desktop API. For an agent on a workstation that already has Beeper Desktop installed and signed in, **the CLI is usually the cheapest, fastest path** — no SDK install, no token plumbing inside your script, JSON envelopes on every command.
+The Beeper team ships a first-class command-line tool that wraps the Desktop API. On a workstation that already has Beeper Desktop installed and signed in, **the CLI is usually the cheapest, fastest path** for agents — no SDK install, no token plumbing inside scripts, JSON envelopes on every command.
 
 This file documents:
 
 1. Install + mental model (targets, auth, JSON output).
-2. The full command surface — what's available, when to use which.
-3. The **runbook for pointing the CLI at a running Beeper Desktop** (and the Linux/auto-auth gotchas you'll hit).
-4. Failure modes and how to recognize them.
+2. The full command surface — what is available, when to use which.
+3. The **runbook for pointing the CLI at a running Beeper Desktop** (with the `dataDir` fix and the manual `bdapi_*` token flow).
+4. How to detect, launch, and wait for Beeper Desktop programmatically when it is not running.
+5. Failure modes and how to recognize them.
 
 > Treat this file as the canonical CLI reference for this skill. Load it whenever the user mentions `beeper` (the CLI), `beeper-cli`, `@beeper/cli`, "the Beeper CLI", `beeper messages`, `beeper chats`, `beeper send`, `beeper api`, `beeper targets`, `beeper status`, `beeper rpc`, etc., **or** asks how to talk to Beeper from a shell / agent / script.
+
+## Contents
+
+- [Install](#install)
+- [Mental model: targets](#mental-model-targets)
+- [Mental model: auth](#mental-model-auth)
+- [Universal flags worth knowing](#universal-flags-worth-knowing)
+- [Command surface (read-most-of-the-API)](#command-surface-read-most-of-the-api)
+- [Runbook: point the CLI at a *running* Beeper Desktop](#runbook-point-the-cli-at-a-running-beeper-desktop)
+- [Beeper Desktop is not running — detect, launch, wait](#beeper-desktop-is-not-running--detect-launch-wait)
+- [Server target vs Desktop target — when to use which](#server-target-vs-desktop-target--when-to-use-which)
+- [Known broken / quirky paths (CLI 0.6.x, Desktop 4.2.x)](#known-broken--quirky-paths-cli-06x-desktop-42x)
+- [Useful one-liners](#useful-one-liners)
+- [When to drop down from CLI to SDK / curl](#when-to-drop-down-from-cli-to-sdk--curl)
 
 ---
 
@@ -173,13 +188,15 @@ beeper api request -X PUT /v1/chats/<id>/messages/<mid> -d '{"text":"edited"}'
 
 ## Runbook: point the CLI at a *running* Beeper Desktop
 
-This is the path you want when:
+Use this path when:
 
 - Beeper Desktop is already open and signed in on the workstation.
-- You don't want to spin up a separate managed Beeper Server (`23374`) — or that server is stuck `initializing`.
-- You want every CLI command to run against the live Desktop session at `127.0.0.1:23373`.
+- A separate managed Beeper Server on `23374` is unwanted, or that server is stuck `initializing`.
+- Every CLI command should run against the live Desktop session at `127.0.0.1:23373`.
 
 Field-tested 4-step procedure (Linux). macOS / Windows steps 2/3 differ — see the [data-dir map](#desktop-data-dir-by-platform) below.
+
+If Beeper Desktop is not running, see [Beeper Desktop is not running — detect, launch, wait](#beeper-desktop-is-not-running--detect-launch-wait) first, then come back here.
 
 ### 1. Verify Desktop is reachable
 
@@ -188,7 +205,7 @@ curl -s http://127.0.0.1:23373/v1/info | jq .app.version
 # Expect e.g. "4.2.923"
 ```
 
-If unreachable: open Beeper Desktop, **Settings → Developers → Beeper Desktop API**, ensure the server is enabled.
+If unreachable, jump to the [launch section](#beeper-desktop-is-not-running--detect-launch-wait).
 
 ### 2. Register a CLI target
 
@@ -196,9 +213,9 @@ If unreachable: open Beeper Desktop, **Settings → Developers → Beeper Deskto
 beeper targets add desktop desktop --port 23373
 ```
 
-This writes `~/.beeper/targets/desktop.json`. **It will fill in a synthetic `dataDir` under `~/.beeper/profiles/desktop/desktop/` that does NOT contain your real Desktop session.**
+This writes `~/.beeper/targets/desktop.json`. **It fills in a synthetic `dataDir` under `~/.beeper/profiles/desktop/desktop/` that does NOT contain the real Desktop session.**
 
-### 3. Fix the `dataDir` so the CLI can find your real session
+### 3. Fix the `dataDir` so the CLI can find the real session
 
 Edit `~/.beeper/targets/desktop.json` and replace BOTH `dataDir` fields with the platform-correct location (see table below).
 
@@ -209,11 +226,11 @@ Edit `~/.beeper/targets/desktop.json` and replace BOTH `dataDir` fields with the
   "name": "desktop",
   "baseURL": "http://127.0.0.1:23373",
   "managed": true,
-  "dataDir": "/home/<you>/.config/BeeperTexts",          // ← FIX
+  "dataDir": "/home/$USER/.config/BeeperTexts",          // ← FIX
   "profile": "desktop",
   "runtime": {
     "install": "desktop",
-    "dataDir": "/home/<you>/.config/BeeperTexts",        // ← FIX
+    "dataDir": "/home/$USER/.config/BeeperTexts",        // ← FIX
     "port": 23373
   },
   "serverEnv": "production",
@@ -223,13 +240,13 @@ Edit `~/.beeper/targets/desktop.json` and replace BOTH `dataDir` fields with the
 
 Alternative (avoids editing JSON): delete both `dataDir` fields entirely so the CLI falls back to its built-in auto-detect (which IS correct — see [data-dir map](#desktop-data-dir-by-platform)).
 
-You can also point auto-detect at a non-default location with `BEEPER_USER_DATA_DIR=...`, but only when `target.dataDir` is unset.
+Auto-detect can also be steered to a non-default location via `BEEPER_USER_DATA_DIR=...`, but only when `target.dataDir` is unset.
 
-### 4. Mint and inject an API token (the only currently-reliable auth path)
+### 4. Mint and inject an API token (the only reliable auth path as of CLI 0.6.x / Desktop 4.2.x)
 
 In Beeper Desktop UI: **Settings → Developers → Approved connections → +**. Copy the resulting `bdapi_...` token.
 
-Inject it. **Pick one** of:
+Inject it. Pick one of:
 
 ```bash
 # (a) Per-shell, transient — best for ad-hoc scripts:
@@ -239,7 +256,7 @@ beeper status --target desktop --base-url http://127.0.0.1:23373
 # (b) Persisted on the target — best for multi-agent setups:
 #     edit ~/.beeper/targets/desktop.json and add:
 #       "auth": { "accessToken": "bdapi_...", "source": "user-provided", "tokenType": "Bearer" }
-beeper auth status --target desktop          # should now say "✓ signed in"
+beeper auth status --target desktop          # should now report "✓ signed in"
 ```
 
 ### 5. Smoke-test
@@ -285,15 +302,79 @@ Inside that dir, `index.db` is a SQLite database with a `key_values` table. Usef
 
 ---
 
+## Beeper Desktop is not running — detect, launch, wait
+
+When the Desktop API at `127.0.0.1:23373` is unreachable, follow this sequence before falling back to a manual UI step.
+
+### 1. Detect
+
+```bash
+# Liveness probe — 200 means Desktop is up and the API is enabled
+http_code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:23373/v1/info)
+[ "$http_code" = "200" ] && echo "up" || echo "down"
+
+# Equivalent via the CLI
+beeper targets status --target desktop --json
+```
+
+### 2. Launch
+
+The CLI offers a launcher that calls into Beeper Desktop's installed binary:
+
+```bash
+beeper targets start --target desktop
+```
+
+**Caveat — works fully on macOS only.** Internally `launchDesktopApp()` calls `spawn('open', …)` with macOS-specific flags (`-n -a Beeper.app --args`). Behavior by platform:
+
+| Platform | `beeper targets start --target desktop` | Reliable launch command |
+|---|---|---|
+| macOS | ✅ Spawns Beeper via `open -n -a Beeper.app` | `open -na Beeper` (or `open -na "Beeper Nightly"`) |
+| Linux | ⚠️ Returns `success: true` if `/usr/bin/open` (xdg-utils shim) exists, but the macOS flags are ignored. Often a no-op. | Spawn the `.AppImage` / installed binary directly, e.g. `nohup ~/Applications/Beeper.AppImage >/dev/null 2>&1 &`. If a `.desktop` entry is registered, `gtk-launch beeper` or `xdg-open beeper:` also works. |
+| Windows | ⚠️ Fails — `open` doesn't exist by default. | `start "" "%LOCALAPPDATA%\Programs\Beeper\Beeper.exe"` (PowerShell: `Start-Process "$env:LOCALAPPDATA\Programs\Beeper\Beeper.exe"`). |
+
+`launchDesktopApp()` is fire-and-forget (`spawn(... { detached: true }).unref()`), so success of the call ≠ Desktop is up. Always follow with the wait loop below.
+
+### 3. Wait for ready
+
+The Electron app + bridges take 2–10 s to bring the API up after process start, plus longer if first-sync needs to run.
+
+```bash
+# Wait up to 60 s for /v1/info to return 200
+for _ in $(seq 1 60); do
+  if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:23373/v1/info)" = "200" ]; then
+    echo "ready"; break
+  fi
+  sleep 1
+done
+```
+
+For a richer readiness signal, poll `beeper status --target desktop --json` and look for `data.app.state` to leave `initializing`.
+
+### 4. Install (only if Desktop isn't even installed)
+
+```bash
+beeper install desktop                      # CLI fetches and installs Beeper Desktop
+beeper install desktop --channel nightly    # nightly build instead of stable
+```
+
+After install, run the launch step.
+
+### 5. Fallback — manual
+
+If automated launch is impractical (e.g. headless server, no GUI, or the launch flags are wrong on the agent's platform), instruct the user: "Open Beeper Desktop. **Settings → Developers → Beeper Desktop API** must be enabled." Then resume from step 1 of the [main runbook](#runbook-point-the-cli-at-a-running-beeper-desktop).
+
+---
+
 ## Server target vs Desktop target — when to use which
 
 | | `beeper-server` (managed Server, port 23374) | `desktop` (running Desktop, port 23373) |
 |---|---|---|
-| Lifecycle | CLI starts/stops a headless beeper-server process for you | You launch Beeper Desktop yourself; CLI just talks to it |
-| Auth bootstrap | `beeper setup --server` walks you through Matrix login + e2ee verification | Manual `bdapi_*` token from the UI (currently the only reliable path) |
-| First-sync time | Can sit in `state: "initializing"` for a long time on a fresh install — many endpoints (`getChat`, `listMessages`, `chats list`, `contacts list`) return `500` / `[]` until first sync + e2ee finish | Already synced if you've been using the app — works immediately |
+| Lifecycle | CLI starts/stops a headless beeper-server process | Beeper Desktop runs as a user-launched Electron app; CLI talks to it |
+| Auth bootstrap | `beeper setup --server` walks through Matrix login + e2ee verification | Manual `bdapi_*` token from the UI (the only reliable path as of CLI 0.6.x / Desktop 4.2.x) |
+| First-sync time | Can sit in `state: "initializing"` for a long time on a fresh install — many endpoints (`getChat`, `listMessages`, `chats list`, `contacts list`) return `500` / `[]` until first sync + e2ee finish | Already synced if the app has been in use — works immediately |
 | Headless / CI | ✅ runs without a desktop session | ❌ requires the Electron app running |
-| Verdict | Use when there's no GUI session, or you want a long-lived background agent | **Default choice on a workstation where Beeper Desktop is already open and signed in.** Faster, more reliable, more endpoints work today. |
+| Verdict | Use when there is no GUI session, or for a long-lived background agent | **Default choice on a workstation where Beeper Desktop is already open and signed in.** Faster, more reliable, more endpoints work today. |
 
 Quick diagnosis when commands return weird errors:
 
@@ -302,7 +383,7 @@ beeper status --target <name>      # human summary
 beeper doctor                       # full readiness JSON: app state, matrix, e2ee, secrets, action hints
 ```
 
-If `doctor` shows `app.state: "initializing"` and you're on a server target, you're hitting a sync-not-finished problem, not an auth problem. Switch to a desktop target if Beeper Desktop is available.
+If `doctor` shows `app.state: "initializing"` on a server target, the cause is sync-not-finished, not auth. Switch to a desktop target if Beeper Desktop is available.
 
 ---
 
@@ -360,10 +441,10 @@ beeper messages export --chat <selector> --output thread.json
 
 ## When to drop down from CLI to SDK / curl
 
-The CLI is the right tool for **almost every shell-level interaction**. Drop down when you need:
+The CLI is the right tool for **almost every shell-level interaction**. Drop down when:
 
-- Tight loops with thousands of calls per minute → use the TS / Python / Go SDK in-process to avoid spawning a binary per call.
-- Custom WebSocket subscription logic with backpressure → connect to `ws://127.0.0.1:23373/v1/ws` directly (see `references/websocket.md`).
-- A deployed agent that needs to run on a machine without `npm` or Node.js → ship a compiled SDK binary instead.
+- Tight loops with thousands of calls per minute are needed → use the TS / Python / Go SDK in-process to avoid spawning a binary per call.
+- Custom WebSocket subscription logic with backpressure is required → connect to `ws://127.0.0.1:23373/v1/ws` directly (see [websocket.md](websocket.md)).
+- The agent must run on a machine without `npm` or Node.js → ship a compiled SDK binary instead.
 
 For everything else — discovery, scripting, ad-hoc recipes, agent prompts that shell out — start with `beeper`.

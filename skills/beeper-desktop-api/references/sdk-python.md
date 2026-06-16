@@ -2,6 +2,21 @@
 
 Official Python SDK for the Beeper Desktop API. Ships both sync (`BeeperDesktop`) and async (`AsyncBeeperDesktop`) clients. Type hints throughout, Pydantic models for responses.
 
+## Contents
+
+- [Install](#install)
+- [Initialization](#initialization)
+- [Method reference](#method-reference)
+- [Pagination](#pagination)
+- [`with_options` — per-call overrides](#with_options--per-call-overrides)
+- [Raw response and streaming access](#raw-response-and-streaming-access)
+- [Escape hatch — undocumented endpoints](#escape-hatch--undocumented-endpoints)
+- [Error classes](#error-classes)
+- [aiohttp backend (optional)](#aiohttp-backend-optional)
+- [Logging](#logging)
+- [End-to-end (sync)](#end-to-end-sync)
+- [End-to-end (async)](#end-to-end-async)
+
 ## Install
 
 ```bash

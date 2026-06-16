@@ -2,6 +2,15 @@
 
 Official Go SDK for the Beeper Desktop API. Context-first, typed params/responses, iterator-based pagination.
 
+## Contents
+
+- [Install](#install)
+- [Initialization](#initialization)
+- [Method reference](#method-reference)
+- [Pagination](#pagination)
+- [Error handling](#error-handling)
+- [End-to-end example](#end-to-end-example)
+
 ## Install
 
 ```bash

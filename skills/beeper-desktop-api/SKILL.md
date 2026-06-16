@@ -1,6 +1,35 @@
 ---
 name: beeper-desktop-api
-description: Complete reference for the Beeper Desktop API — a local HTTP + WebSocket + MCP server exposed by Beeper Desktop that lets code read, search, send, edit, react to, and stream messages across WhatsApp, iMessage, Telegram, Signal, Twitter/X, Discord, and every other network connected to the Beeper client. Use this skill whenever the user asks to build against the Beeper Desktop API, wire up the Beeper MCP server, send or search messages across chat networks through Beeper, automate Beeper Desktop, use the official `beeper` / `@beeper/cli` command-line tool (commands like `beeper messages`, `beeper chats`, `beeper send`, `beeper api`, `beeper targets`, `beeper watch`, `beeper rpc`, `beeper status`, `beeper doctor`), use the SDKs (`@beeper/desktop-api` TS, `beeper_desktop_api` Python, `github.com/beeper/desktop-api-go`), subscribe to realtime message events via `ws://localhost:23373/v1/ws`, upload/download attachments via the Beeper assets endpoints, or integrate Beeper into an agent/script — including pointing the CLI at a running Beeper Desktop instance.
+description: |
+  Local HTTP + WebSocket + MCP server exposed by Beeper Desktop for reading,
+  searching, sending, editing, reacting to, and streaming messages across
+  WhatsApp, iMessage, Telegram, Signal, Twitter/X, Discord, and every other
+  network connected to the Beeper client. Use when the user asks to build
+  against the Beeper Desktop API; wire up the Beeper MCP server; send or
+  search messages across chat networks through Beeper; automate Beeper
+  Desktop; use the official `beeper` CLI / `@beeper/cli` (e.g. `beeper
+  messages`, `beeper chats`, `beeper send`, `beeper targets`, `beeper watch`,
+  `beeper rpc`); use the `@beeper/desktop-api`, `beeper_desktop_api`, or
+  `desktop-api-go` SDKs; subscribe to realtime events via
+  `ws://localhost:23373/v1/ws`; upload/download attachments via the assets
+  endpoints; launch Beeper Desktop programmatically; or point a CLI / SDK
+  at a running Beeper Desktop or managed Beeper Server target.
+license: MIT
+compatibility: |
+  Requires Beeper Desktop ≥ 4.1.169 with Settings → Developers → Beeper
+  Desktop API enabled. References cover the official `@beeper/cli`, the
+  `@beeper/desktop-api` (TS), `beeper_desktop_api` (Python), and
+  `github.com/beeper/desktop-api-go` SDKs, plus the experimental WebSocket
+  event stream and the built-in MCP server.
+metadata:
+  version: "1.1.0"
+  upstream: https://github.com/gfsaaser24/beeper-desktop-api-skill
+  changelog: |
+    1.1.0 — Add references/cli.md (Beeper CLI reference + Desktop-target
+            runbook + programmatic launch). Convert reference list to real
+            markdown links, add TOCs to large references, and fold license /
+            compatibility / version metadata into frontmatter.
+    1.0.0 — Initial port of the upstream skill.
 ---
 
 # Beeper Desktop API
@@ -19,7 +48,7 @@ Beeper Desktop ships a local REST + WebSocket + MCP server that lets code intera
 
 1. Install Beeper Desktop from https://www.beeper.com/download (v4.1.169 or newer).
 2. Open Beeper, go to **Settings → Developers → Beeper Desktop API**, and enable the server.
-3. In **Settings → Developers → Approved connections**, click **+** to create an access token. Save it — you will need it for every request.
+3. In **Settings → Developers → Approved connections**, click **+** to create an access token. Save it — every request needs it as a bearer token.
 
 Environment variable convention used by the SDKs: `BEEPER_ACCESS_TOKEN`.
 
@@ -64,7 +93,7 @@ beeper watch --json                                 # realtime NDJSON stream
 beeper api get /v1/info                             # raw HTTP escape hatch
 ```
 
-For the full command surface, the **runbook for pointing the CLI at a running Beeper Desktop** (including the `dataDir` fix and the manual `bdapi_*` token flow), known broken paths, and recipes — load **`references/cli.md`**. Whenever the user mentions `beeper` (the CLI), `beeper-cli`, `@beeper/cli`, or any `beeper <subcommand>`, that file is the canonical answer.
+For the full command surface, the **runbook for pointing the CLI at a running Beeper Desktop** (including the `dataDir` fix, the manual `bdapi_*` token flow, and how to launch Desktop programmatically when it isn't running), known broken paths, and recipes — load [references/cli.md](references/cli.md). Whenever the user mentions `beeper` (the CLI), `beeper-cli`, `@beeper/cli`, or any `beeper <subcommand>`, that file is the canonical answer.
 
 ## SDKs
 
@@ -77,9 +106,9 @@ For the full command surface, the **runbook for pointing the CLI at a running Be
 
 For complete SDK method maps (every method, every param, every response shape), load:
 
-- `references/sdk-typescript.md` — TS SDK (`@beeper/desktop-api`)
-- `references/sdk-python.md` — Python SDK (sync + async)
-- `references/sdk-go.md` — Go SDK
+- [references/sdk-typescript.md](references/sdk-typescript.md) — TS SDK (`@beeper/desktop-api`)
+- [references/sdk-python.md](references/sdk-python.md) — Python SDK (sync + async)
+- [references/sdk-go.md](references/sdk-go.md) — Go SDK
 
 ## Quick start
 
@@ -190,15 +219,15 @@ accounts, _ := client.Accounts.List(context.TODO())
 | OAuth | GET | `/.well-known/oauth-authorization-server` | OAuth 2.0 discovery |
 | OAuth | POST | `/oauth/introspect` | Token introspection |
 
-**Full parameter, request body, and response schemas for every endpoint are in `references/endpoints-rest.md`. Always load that file before writing code against a specific endpoint.**
+**Full parameter, request body, and response schemas for every endpoint are in [references/endpoints-rest.md](references/endpoints-rest.md). Always load that file before writing code against a specific endpoint.**
 
 ## Realtime events (WebSocket, experimental)
 
-Connect to `ws://localhost:23373/v1/ws` with `Authorization: Bearer <token>`, send a `subscriptions.set` command, and receive `chat.upserted` / `chat.deleted` / `message.upserted` / `message.deleted` events. Full protocol + schemas in `references/websocket.md`.
+Connect to `ws://localhost:23373/v1/ws` with `Authorization: Bearer <token>`, send a `subscriptions.set` command, and receive `chat.upserted` / `chat.deleted` / `message.upserted` / `message.deleted` events. Full protocol + schemas in [references/websocket.md](references/websocket.md).
 
 ## MCP server
 
-Beeper Desktop ships a built-in MCP server so agents (Claude Code, Cursor, VS Code, Windsurf, Gemini CLI) can search and send messages via MCP tools. Full setup by client in `references/mcp-server.md`.
+Beeper Desktop ships a built-in MCP server so agents (Claude Code, Cursor, VS Code, Windsurf, Gemini CLI) can search and send messages via MCP tools. Full setup by client in [references/mcp-server.md](references/mcp-server.md).
 
 Quick add for Claude Code:
 
@@ -210,19 +239,19 @@ claude mcp add beeper http://localhost:23373/v0/mcp -t http -s user
 
 Load the relevant file for the task at hand:
 
-- **`references/cli.md`** — `@beeper/cli` (`beeper`) reference: targets model, auth resolution, full command surface, runbook for pointing the CLI at a running Beeper Desktop (with the Linux `dataDir` fix and the manual `bdapi_*` token flow), known broken paths, recipes. Load this whenever the user is using or asking about the `beeper` CLI.
-- **`references/endpoints-rest.md`** — every REST endpoint with full request/response schemas, path/query/body params, and curl examples. Load this whenever writing direct HTTP calls or needing exhaustive param detail.
-- **`references/sdk-typescript.md`** — `@beeper/desktop-api` complete method map, types, options, pagination, error classes.
-- **`references/sdk-python.md`** — `beeper_desktop_api` sync and async clients, every namespace/method.
-- **`references/sdk-go.md`** — `github.com/beeper/desktop-api-go` complete method map.
-- **`references/schemas.md`** — shared object types (Account, Chat, Message, Attachment, Reaction, Participant) used everywhere in responses.
-- **`references/websocket.md`** — experimental WebSocket realtime event protocol.
-- **`references/mcp-server.md`** — MCP server setup for every client (Claude Desktop, Claude Code, Cursor, VS Code, Raycast, Windsurf, Warp, Codex, Gemini CLI) plus stdio proxy via `@beeper/mcp-remote`.
-- **`references/remote-access.md`** — exposing the API to other machines: Advanced Settings toggle, `0.0.0.0` binding, `X-Forwarded-Host` / `X-Forwarded-Proto` base-URL derivation, Cloudflare Quick Tunnels setup, and the SSE-over-Cloudflare limitation.
-- **`references/bridges-self-hosting.md`** — `bbctl` (Beeper Bridge Manager) overview, install/login/run, official bridge identifiers (telegram, whatsapp, signal, discord, slack, gmessages, meta, twitter, bluesky, imessage, linkedin, irc, …), and how self-hosted bridges surface through the Desktop API.
-- **`references/authentication.md`** — in-app vs OAuth, introspection, MCP auth bypass, CORS notes.
-- **`references/errors.md`** — status codes and error response shape.
-- **`references/cookbook.md`** — common recipes (bulk DM, watch a chat, scrape messages to CSV, etc.).
+- [references/cli.md](references/cli.md) — `@beeper/cli` (`beeper`) reference: targets model, auth resolution, full command surface, runbook for pointing the CLI at a running Beeper Desktop (with the Linux `dataDir` fix, the manual `bdapi_*` token flow, and how to launch Desktop programmatically), known broken paths, recipes. Load this whenever the user is using or asking about the `beeper` CLI.
+- [references/endpoints-rest.md](references/endpoints-rest.md) — every REST endpoint with full request/response schemas, path/query/body params, and curl examples. Load this whenever writing direct HTTP calls or needing exhaustive param detail.
+- [references/sdk-typescript.md](references/sdk-typescript.md) — `@beeper/desktop-api` complete method map, types, options, pagination, error classes.
+- [references/sdk-python.md](references/sdk-python.md) — `beeper_desktop_api` sync and async clients, every namespace/method.
+- [references/sdk-go.md](references/sdk-go.md) — `github.com/beeper/desktop-api-go` complete method map.
+- [references/schemas.md](references/schemas.md) — shared object types (Account, Chat, Message, Attachment, Reaction, Participant) used everywhere in responses.
+- [references/websocket.md](references/websocket.md) — experimental WebSocket realtime event protocol.
+- [references/mcp-server.md](references/mcp-server.md) — MCP server setup for every client (Claude Desktop, Claude Code, Cursor, VS Code, Raycast, Windsurf, Warp, Codex, Gemini CLI) plus stdio proxy via `@beeper/mcp-remote`.
+- [references/remote-access.md](references/remote-access.md) — exposing the API to other machines: Advanced Settings toggle, `0.0.0.0` binding, `X-Forwarded-Host` / `X-Forwarded-Proto` base-URL derivation, Cloudflare Quick Tunnels setup, and the SSE-over-Cloudflare limitation.
+- [references/bridges-self-hosting.md](references/bridges-self-hosting.md) — `bbctl` (Beeper Bridge Manager) overview, install/login/run, official bridge identifiers (telegram, whatsapp, signal, discord, slack, gmessages, meta, twitter, bluesky, imessage, linkedin, irc, …), and how self-hosted bridges surface through the Desktop API.
+- [references/authentication.md](references/authentication.md) — in-app vs OAuth, introspection, MCP auth bypass, CORS notes.
+- [references/errors.md](references/errors.md) — status codes and error response shape.
+- [references/cookbook.md](references/cookbook.md) — common recipes (bulk DM, watch a chat, scrape messages to CSV, etc.).
 
 ## Out of scope (other Beeper developer surfaces)
 

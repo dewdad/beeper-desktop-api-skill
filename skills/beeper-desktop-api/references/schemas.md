@@ -2,6 +2,16 @@
 
 Every Beeper Desktop API response shares a small set of object shapes. TypeScript-style interfaces below; Python/Go SDKs translate these to snake_case / PascalCase but preserve the fields.
 
+## Contents
+
+- [`Account`](#account)
+- [`Participant`](#participant)
+- [`Chat`](#chat)
+- [`Message`](#message)
+- [`Attachment`](#attachment)
+- [`Reaction`](#reaction)
+- [Paginated wrapper](#paginated-wrapper)
+
 ## `Account`
 
 Represents a connected network (one per WhatsApp/iMessage/Telegram/etc. bridge).

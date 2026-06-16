@@ -2,6 +2,17 @@
 
 Official TypeScript/JavaScript SDK for the Beeper Desktop API. Works in Node.js, browsers (with CORS enabled on the server), Deno, Bun, and Cloudflare Workers.
 
+## Contents
+
+- [Install](#install)
+- [Initialization](#initialization)
+- [Method reference](#method-reference)
+- [Auto-pagination](#auto-pagination)
+- [Error handling](#error-handling)
+- [Raw response access](#raw-response-access)
+- [Escape hatch — undocumented endpoints](#escape-hatch--undocumented-endpoints)
+- [End-to-end example](#end-to-end-example)
+
 ## Install
 
 ```bash

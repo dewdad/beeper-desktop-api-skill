@@ -2,6 +2,15 @@
 
 Realtime event stream for chats and messages. Experimental — the schema may evolve. The URL is advertised by `GET /v1/info` as `endpoints.ws_events`.
 
+## Contents
+
+- [Connection](#connection)
+- [Client → server commands](#client---server-commands)
+- [Server → client control messages](#server---client-control-messages)
+- [Domain events](#domain-events)
+- [Node.js client example](#nodejs-client-example)
+- [Python client example](#python-client-example)
+
 ## Connection
 
 ```

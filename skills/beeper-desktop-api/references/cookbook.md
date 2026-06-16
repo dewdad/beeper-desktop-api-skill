@@ -6,6 +6,19 @@ Copy-pasteable end-to-end recipes. Every recipe assumes `BEEPER_ACCESS_TOKEN` is
 export BEEPER_ACCESS_TOKEN="your_token_here"
 ```
 
+## Contents
+
+1. [Export all messages from one chat to CSV (Python)](#1-export-all-messages-from-one-chat-to-csv-python)
+2. [Find invoice images across all networks and save them locally (Python)](#2-find-invoice-images-across-all-networks-and-save-them-locally-python)
+3. [Auto-reply bot on a keyword (Node/TypeScript)](#3-auto-reply-bot-on-a-keyword-nodetypescript)
+4. [Bulk DM contacts from a CSV (Python)](#4-bulk-dm-contacts-from-a-csv-python)
+5. [Cross-network unified search from the CLI (bash + curl)](#5-cross-network-unified-search-from-the-cli-bash--curl)
+6. [Daily unread digest (Python)](#6-daily-unread-digest-python)
+7. [Focus Beeper with a pre-filled draft (curl)](#7-focus-beeper-with-a-pre-filled-draft-curl)
+8. [Watch one chat via WebSocket (Node)](#8-watch-one-chat-via-websocket-node)
+9. [Send an image attachment (two-step curl)](#9-send-an-image-attachment-two-step-curl)
+10. [Paginate through all chats oldest → newest (Python)](#10-paginate-through-all-chats-oldest---newest-python)
+
 ---
 
 ## 1. Export all messages from one chat to CSV (Python)
