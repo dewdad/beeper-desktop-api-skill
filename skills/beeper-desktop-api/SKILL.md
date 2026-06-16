@@ -114,6 +114,8 @@ beeper chats list --target desktop --unread --no-muted --no-low-priority --limit
 
 ### Realtime: `beeper watch` `--target` is broken — use `--base-url`
 
+> Upstream bug: [beeper/cli#19](https://github.com/beeper/cli/issues/19). Confirmed in `@beeper/cli` 0.6.2.
+
 In `@beeper/cli` ≥ 0.6.x, **`beeper watch` ignores the `-t` / `--target` flag**. It only honors `--base-url`. If you have both a `desktop` target (`:23373`, signed-in user) AND a `beeper-server` target (`:23374`, often `initializing`), `beeper watch --target desktop` silently falls through to the default target (beeper-server) and you'll see the WS handshake (`ready` + `subscriptions.updated`) but **zero domain events**, because beeper-server has no real account data flowing yet.
 
 **Symptom:** stdout stays at 2 lines (`ready` + `subscriptions.updated` — note `"app": { "state": false }`) and never emits `message.upserted` / `chat.upserted` while messages are flowing.
