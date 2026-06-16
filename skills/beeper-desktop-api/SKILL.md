@@ -22,9 +22,15 @@ compatibility: |
   `github.com/beeper/desktop-api-go` SDKs, plus the experimental WebSocket
   event stream and the built-in MCP server.
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
   upstream: https://github.com/gfsaaser24/beeper-desktop-api-skill
   changelog: |
+    1.2.0 — Progressive disclosure: trimmed always-loaded SKILL.md from ~336
+            to ~200 lines. Moved per-language Quick Start snippets, full REST
+            endpoint table, deep Authentication, CLI overview, SDKs install
+            table, and MCP setup into their existing references/*.md files
+            (load on demand). Replaced the Reference files narrative with a
+            decision table ("if you're doing X, load Y FIRST").
     1.1.0 — Add references/cli.md (Beeper CLI reference + Desktop-target
             runbook + programmatic launch). Convert reference list to real
             markdown links, add TOCs to large references, and fold license /
@@ -34,23 +40,21 @@ metadata:
 
 # Beeper Desktop API
 
-## Overview
+Local REST + WebSocket + MCP server exposed by Beeper Desktop. Lets code talk to every chat network the user has connected (WhatsApp, iMessage, Signal, Telegram, Twitter/X, Discord, Matrix, Instagram, LinkedIn, …) through one unified surface.
 
-Beeper Desktop ships a local REST + WebSocket + MCP server that lets code interact with every chat network the user has connected — WhatsApp, iMessage, Signal, Telegram, Twitter/X, Discord, Matrix, Instagram, LinkedIn, etc. — through a single unified surface.
-
-**Default server:** `http://localhost:23373`
-**WebSocket:** `ws://localhost:23373/v1/ws`
-**MCP (HTTP stream):** `http://localhost:23373/v0/mcp`
-**MCP (SSE):** `http://localhost:23373/v0/sse`
-**Minimum Beeper Desktop version:** 4.1.169+
+- **Default REST base:** `http://localhost:23373` (`/v1/*` is current; `/v0/*` is deprecated)
+- **WebSocket:** `ws://localhost:23373/v1/ws`
+- **MCP:** `http://localhost:23373/v0/mcp` (HTTP-stream) or `.../v0/sse`
+- **Minimum Beeper Desktop version:** 4.1.169+
 
 ## Prerequisites
 
 1. Install Beeper Desktop from https://www.beeper.com/download (v4.1.169 or newer).
 2. Open Beeper, go to **Settings → Developers → Beeper Desktop API**, and enable the server.
-3. In **Settings → Developers → Approved connections**, click **+** to create an access token. Save it — every request needs it as a bearer token.
+3. In **Settings → Developers → Approved connections**, click **+** to create an access token.
+4. Export it as `BEEPER_ACCESS_TOKEN` — every request needs it as a bearer token.
 
-Environment variable convention used by the SDKs: `BEEPER_ACCESS_TOKEN`.
+OAuth 2.0 (PKCE) and token introspection are also supported — see [references/authentication.md](references/authentication.md).
 
 ## Pre-flight (run this FIRST when CLI/SDK returns empty data)
 
@@ -112,213 +116,42 @@ beeper chats list --target desktop --unread --no-muted --no-low-priority --limit
 - **Chat sort order.** `chats list` returns chats sorted by `lastActivity` descending — first item is the most recently active.
 - **Filter flags exist for noise reduction** (often missed): `--unread`, `--no-muted`, `--no-low-priority`, `--no-archived`, `--pinned`, `--account <id|network|bridge>`. Combine them.
 
-## Authentication
+## Key concepts (routing essentials only)
 
-All endpoints (REST, WebSocket, and MCP) accept a standard bearer token:
-
-```
-Authorization: Bearer <your_token>
-```
-
-Token acquisition modes:
-
-- **In-app** — Settings → Developers → Approved connections → **+**.
-- **OAuth 2.0 (PKCE)** — Discovery metadata at `GET /.well-known/oauth-authorization-server` (RFC 8414). The built-in MCP server handles OAuth automatically per the MCP authorization spec. Most clients (Claude Code, Cursor, VS Code, Windsurf, Gemini CLI) go through OAuth automatically when connecting to the HTTP-streamable MCP endpoint.
-- **Token introspection** — `POST /oauth/introspect` with `Content-Type: application/x-www-form-urlencoded` body `token=<token>&token_type_hint=access_token`. Returns `{ active: true, ... }` or `{ active: false }`.
-
-When a bearer token is passed to the MCP endpoints (`/v0/mcp`, `/v0/sse`), OAuth is bypassed and the token is used directly.
-
-## Key concepts
-
-- **accountID** — stable ID for a connected network (e.g. `local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc`). **Always use `accountID`** for routing actions. `network` (`"WhatsApp"`, `"Telegram"`, ...) is display-only.
-- **chatID** — room/thread identifier, often in Matrix format (`!NCdzlIaMjZUmvmvyHU:beeper.com`). Some chats (notably iMessage) don't have durable IDs — use `localChatID` when surfaced.
-- **messageID** — stable per-message ID, suitable for cursor-based pagination and editing/reacting.
-- **Pagination model** — cursor-based. Responses return `oldestCursor` / `newestCursor` + `hasMore`. To fetch the next page, pass the appropriate cursor plus `direction=before` (older) or `direction=after` (newer). The TS/Python/Go SDKs hide this behind async iterators.
-- **Attachments** — upload first to `/v1/assets/upload` (multipart) or `/v1/assets/upload/base64`, get back an `uploadID`, then reference that `uploadID` in the `attachment` field of `POST /v1/chats/{chatID}/messages`.
-- **Asset URLs** — `mxc://...` (remote Matrix content), `localmxc://...` (local Beeper content), or `file://...`. Download via `POST /v1/assets/download` or stream directly via `GET /v1/assets/serve?url=...` (supports HTTP Range).
-- **Editing** — text-only. Messages with attachments cannot be edited.
+- **`accountID`** — stable ID for a connected network (e.g. `local-whatsapp_ba_EvYDBBsZbRQAy3UOSWqG0LuTVkc`). **Always use `accountID`** for routing actions. `network` (`"WhatsApp"`, `"Telegram"`, …) is a display label and can change between releases.
+- **`chatID`** — room/thread identifier, often Matrix-format (`!NCdzlIaMjZUmvmvyHU:beeper.com`). iMessage chats may not have a durable `chatID` — fall back to `localChatID`.
+- **`messageID`** — stable per-message ID, suitable for cursor-based pagination and editing/reacting.
+- **Pagination** — cursor-based. Responses return `oldestCursor` / `newestCursor` + `hasMore`. Pass cursors back verbatim with `direction=before` (older) or `direction=after` (newer). The TS/Python/Go SDKs hide this behind async iterators.
+- **Attachments are a 2-step flow** — upload first to `/v1/assets/upload` (multipart) or `/v1/assets/upload/base64`, get back an `uploadID`, then reference that `uploadID` in the `attachment` field of `POST /v1/chats/{chatID}/messages`. Full schemas in [references/endpoints-rest.md](references/endpoints-rest.md).
 - **Versioning** — `/v1/*` is the current RESTful surface. `/v0/*` is gRPC-style and deprecated (breaking change in Beeper Desktop 4.1.294, 2025-10-16). Always prefer `/v1`.
 
-## CLI (`@beeper/cli`)
+Detailed object shapes (`Account`, `Chat`, `Message`, `Attachment`, `Reaction`, `Participant`) → [references/schemas.md](references/schemas.md).
 
-The official `beeper` command-line tool is the cheapest, fastest path for shell-level automation, agents, and ad-hoc scripts on a workstation that already has Beeper Desktop installed and signed in. It wraps every endpoint listed below, returns `--json` envelopes, and supports multiple **targets** (a running Beeper Desktop on `:23373`, a CLI-managed Beeper Server on `:23374`, or a remote URL).
+## When to load which reference
 
-```bash
-npm install -g @beeper/cli
-beeper status                                      # readiness + endpoint
-beeper accounts list --json                         # connected networks
-beeper messages search "invoice" --account whatsapp --limit 20 --json
-beeper send "Hi" --chat <selector>
-beeper watch --json                                 # realtime NDJSON stream
-beeper api get /v1/info                             # raw HTTP escape hatch
-```
+Decide what you're doing, load the matching file FIRST, then write code:
 
-For the full command surface, the **runbook for pointing the CLI at a running Beeper Desktop** (including the `dataDir` fix, the manual `bdapi_*` token flow, and how to launch Desktop programmatically when it isn't running), known broken paths, and recipes — load [references/cli.md](references/cli.md). Whenever the user mentions `beeper` (the CLI), `beeper-cli`, `@beeper/cli`, or any `beeper <subcommand>`, that file is the canonical answer.
+| If you're doing… | Load this reference FIRST |
+|---|---|
+| Anything with the `beeper` CLI (commands, targets, runbook for pointing at running Desktop, programmatic launch, broken paths) | [references/cli.md](references/cli.md) |
+| Writing TypeScript / JavaScript / Node / Deno / Bun code | [references/sdk-typescript.md](references/sdk-typescript.md) |
+| Writing Python (sync or async) | [references/sdk-python.md](references/sdk-python.md) |
+| Writing Go | [references/sdk-go.md](references/sdk-go.md) |
+| Writing direct HTTP / curl, or need exhaustive request/response schemas | [references/endpoints-rest.md](references/endpoints-rest.md) |
+| Setting up the MCP server in any agent client (Claude Desktop, Claude Code, Cursor, VS Code, Raycast, Windsurf, Warp, Codex, Gemini CLI, stdio bridges) | [references/mcp-server.md](references/mcp-server.md) |
+| Subscribing to realtime events (`chat.upserted`, `message.upserted`, …) | [references/websocket.md](references/websocket.md) |
+| OAuth 2.0 / PKCE / token introspection / MCP auth bypass / CORS | [references/authentication.md](references/authentication.md) |
+| Status codes, error envelope shape, retry semantics | [references/errors.md](references/errors.md) |
+| Calling the API from another machine (`0.0.0.0` binding, Cloudflare Tunnel, SSE caveats) | [references/remote-access.md](references/remote-access.md) |
+| Self-hosting bridges (`bbctl` / Beeper Bridge Manager, official bridge IDs) | [references/bridges-self-hosting.md](references/bridges-self-hosting.md) |
+| Recipe-shaped tasks (bulk DM, scrape to CSV, watch a chat, …) | [references/cookbook.md](references/cookbook.md) |
+| Decoding response field shapes (`Message`, `Chat`, `Account`, `Attachment`, …) | [references/schemas.md](references/schemas.md) |
 
-## SDKs
+> **Default path on a workstation that already has Beeper Desktop signed in:** start with the CLI ([references/cli.md](references/cli.md)). It needs no SDK install, no token plumbing, and emits `--json` envelopes. Only drop down to an SDK or raw HTTP when the CLI doesn't expose the needed surface or you're embedding into a long-running process.
 
-| Language | Package | Install |
-|---|---|---|
-| TypeScript | `@beeper/desktop-api` | `npm install @beeper/desktop-api` |
-| Python | `beeper_desktop_api` | `pip install git+ssh://git@github.com/beeper/desktop-api-python.git` |
-| Go | `github.com/beeper/desktop-api-go` | `go get github.com/beeper/desktop-api-go` |
-| Terraform / Ruby / Java / Kotlin | Listed in docs | — |
+## Out of scope
 
-For complete SDK method maps (every method, every param, every response shape), load:
-
-- [references/sdk-typescript.md](references/sdk-typescript.md) — TS SDK (`@beeper/desktop-api`)
-- [references/sdk-python.md](references/sdk-python.md) — Python SDK (sync + async)
-- [references/sdk-go.md](references/sdk-go.md) — Go SDK
-
-## Quick start
-
-### curl
-
-```bash
-export BEEPER_ACCESS_TOKEN="your_token_here"
-
-# 1. Verify the server is up and discover endpoints
-curl http://localhost:23373/v1/info \
-  -H "Authorization: Bearer $BEEPER_ACCESS_TOKEN"
-
-# 2. List connected networks
-curl http://localhost:23373/v1/accounts \
-  -H "Authorization: Bearer $BEEPER_ACCESS_TOKEN"
-
-# 3. List chats (paginated)
-curl http://localhost:23373/v1/chats \
-  -H "Authorization: Bearer $BEEPER_ACCESS_TOKEN"
-
-# 4. Send a message
-curl -X POST http://localhost:23373/v1/chats/$CHAT_ID/messages \
-  -H "Authorization: Bearer $BEEPER_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Hello from curl"}'
-```
-
-### TypeScript
-
-```ts
-import BeeperDesktop from '@beeper/desktop-api';
-
-const client = new BeeperDesktop({ accessToken: process.env.BEEPER_ACCESS_TOKEN });
-
-const info = await client.info.retrieve();
-const accounts = await client.accounts.list();
-
-// Auto-paginate messages matching a query
-for await (const msg of client.messages.search({ query: 'invoice', limit: 50 })) {
-  console.log(msg.senderName, msg.text);
-}
-
-// Send a reply
-await client.messages.send(chatID, { text: 'On it', replyToMessageID: msgID });
-```
-
-### Python
-
-```python
-from beeper_desktop_api import BeeperDesktop
-
-client = BeeperDesktop()  # reads BEEPER_ACCESS_TOKEN from env
-
-info = client.info.retrieve()
-for account in client.accounts.list():
-    print(account.network, account.account_id)
-
-for msg in client.messages.search(query="invoice", limit=50):
-    print(msg.sender_name, msg.text)
-
-client.messages.send(chat_id, body={"text": "On it", "reply_to_message_id": msg_id})
-```
-
-### Go
-
-```go
-import (
-    "context"
-    beeperdesktopapi "github.com/beeper/desktop-api-go"
-    "github.com/beeper/desktop-api-go/option"
-)
-
-client := beeperdesktopapi.NewClient(
-    option.WithAccessToken(os.Getenv("BEEPER_ACCESS_TOKEN")),
-)
-
-info, _ := client.Info.Get(context.TODO())
-accounts, _ := client.Accounts.List(context.TODO())
-```
-
-## REST endpoint summary
-
-| Area | Method | Path | Summary |
-|---|---|---|---|
-| Server | GET | `/v1/info` | Discovery: app/platform/server/endpoints metadata |
-| Accounts | GET | `/v1/accounts` | List connected networks |
-| Chats | GET | `/v1/chats` | List chats (paginated, sorted by last activity) |
-| Chats | POST | `/v1/chats` | Create (`mode=create`) or start (`mode=start`) a chat |
-| Chats | GET | `/v1/chats/{chatID}` | Retrieve chat details |
-| Chats | GET | `/v1/chats/search` | Search chats by title/participants |
-| Chats | POST | `/v1/chats/{chatID}/archive` | Archive / unarchive |
-| Reminders | POST | `/v1/chats/{chatID}/reminders` | Create chat reminder |
-| Reminders | DELETE | `/v1/chats/{chatID}/reminders` | Clear chat reminder |
-| Messages | GET | `/v1/chats/{chatID}/messages` | List messages (cursor pagination) |
-| Messages | POST | `/v1/chats/{chatID}/messages` | Send message (text, attachment, reply) |
-| Messages | PUT | `/v1/chats/{chatID}/messages/{messageID}` | Edit message text |
-| Reactions | POST | `/v1/chats/{chatID}/messages/{messageID}/reactions` | Add reaction |
-| Reactions | DELETE | `/v1/chats/{chatID}/messages/{messageID}/reactions` | Remove reaction |
-| Messages | GET | `/v1/messages/search` | Cross-chat message search with filters |
-| Contacts | GET | `/v1/accounts/{accountID}/contacts` | Search contacts on one account |
-| Contacts | GET | `/v1/accounts/{accountID}/contacts/list` | Paginated contact list |
-| Search | GET | `/v1/search` | Unified search (chats + participants + first page of messages) |
-| Assets | GET | `/v1/assets/serve?url=` | Stream asset (Range-supported) |
-| Assets | POST | `/v1/assets/download` | Download mxc/localmxc to local file URL |
-| Assets | POST | `/v1/assets/upload` | Upload via multipart/form-data |
-| Assets | POST | `/v1/assets/upload/base64` | Upload via JSON base64 |
-| App | POST | `/v1/focus` | Focus Beeper Desktop window, optionally open chat/message/draft |
-| OAuth | GET | `/.well-known/oauth-authorization-server` | OAuth 2.0 discovery |
-| OAuth | POST | `/oauth/introspect` | Token introspection |
-
-**Full parameter, request body, and response schemas for every endpoint are in [references/endpoints-rest.md](references/endpoints-rest.md). Always load that file before writing code against a specific endpoint.**
-
-## Realtime events (WebSocket, experimental)
-
-Connect to `ws://localhost:23373/v1/ws` with `Authorization: Bearer <token>`, send a `subscriptions.set` command, and receive `chat.upserted` / `chat.deleted` / `message.upserted` / `message.deleted` events. Full protocol + schemas in [references/websocket.md](references/websocket.md).
-
-## MCP server
-
-Beeper Desktop ships a built-in MCP server so agents (Claude Code, Cursor, VS Code, Windsurf, Gemini CLI) can search and send messages via MCP tools. Full setup by client in [references/mcp-server.md](references/mcp-server.md).
-
-Quick add for Claude Code:
-
-```bash
-claude mcp add beeper http://localhost:23373/v0/mcp -t http -s user
-```
-
-## Reference files
-
-Load the relevant file for the task at hand:
-
-- [references/cli.md](references/cli.md) — `@beeper/cli` (`beeper`) reference: targets model, auth resolution, full command surface, runbook for pointing the CLI at a running Beeper Desktop (with the Linux `dataDir` fix, the manual `bdapi_*` token flow, and how to launch Desktop programmatically), known broken paths, recipes. Load this whenever the user is using or asking about the `beeper` CLI.
-- [references/endpoints-rest.md](references/endpoints-rest.md) — every REST endpoint with full request/response schemas, path/query/body params, and curl examples. Load this whenever writing direct HTTP calls or needing exhaustive param detail.
-- [references/sdk-typescript.md](references/sdk-typescript.md) — `@beeper/desktop-api` complete method map, types, options, pagination, error classes.
-- [references/sdk-python.md](references/sdk-python.md) — `beeper_desktop_api` sync and async clients, every namespace/method.
-- [references/sdk-go.md](references/sdk-go.md) — `github.com/beeper/desktop-api-go` complete method map.
-- [references/schemas.md](references/schemas.md) — shared object types (Account, Chat, Message, Attachment, Reaction, Participant) used everywhere in responses.
-- [references/websocket.md](references/websocket.md) — experimental WebSocket realtime event protocol.
-- [references/mcp-server.md](references/mcp-server.md) — MCP server setup for every client (Claude Desktop, Claude Code, Cursor, VS Code, Raycast, Windsurf, Warp, Codex, Gemini CLI) plus stdio proxy via `@beeper/mcp-remote`.
-- [references/remote-access.md](references/remote-access.md) — exposing the API to other machines: Advanced Settings toggle, `0.0.0.0` binding, `X-Forwarded-Host` / `X-Forwarded-Proto` base-URL derivation, Cloudflare Quick Tunnels setup, and the SSE-over-Cloudflare limitation.
-- [references/bridges-self-hosting.md](references/bridges-self-hosting.md) — `bbctl` (Beeper Bridge Manager) overview, install/login/run, official bridge identifiers (telegram, whatsapp, signal, discord, slack, gmessages, meta, twitter, bluesky, imessage, linkedin, irc, …), and how self-hosted bridges surface through the Desktop API.
-- [references/authentication.md](references/authentication.md) — in-app vs OAuth, introspection, MCP auth bypass, CORS notes.
-- [references/errors.md](references/errors.md) — status codes and error response shape.
-- [references/cookbook.md](references/cookbook.md) — common recipes (bulk DM, watch a chat, scrape messages to CSV, etc.).
-
-## Out of scope (other Beeper developer surfaces)
-
-developers.beeper.com also documents two adjacent surfaces that are NOT part of the Desktop API and therefore not covered by this skill beyond a brief mention here:
-
-- **Android Content Providers** — `content://com.beeper.api/{chats,messages,contacts}` exposed by Beeper Android under permissions `com.beeper.android.permission.READ_PERMISSION` / `SEND_PERMISSION`. Separate API with its own columns, parameters, and change-notification model. Use the official Android docs when building against this.
-- **Android Intents** — e.g. `com.beeper.android.TOGGLE_INCOGNITO_MODE` broadcast (requires Beeper Android ≥ 4.31.1 and a Plus subscription). Android-only.
+Beeper publishes two unrelated developer surfaces that this skill does NOT cover: **Android Content Providers** (`content://com.beeper.api/...`) and **Android Intents** (e.g. `com.beeper.android.TOGGLE_INCOGNITO_MODE`). Use the official Android docs for those.
 
 ## Guardrails
 
@@ -328,9 +161,9 @@ developers.beeper.com also documents two adjacent surfaces that are NOT part of 
 - **`senderName` is optional.** Always fall back to `senderID`.
 - **`beeper send` is a command group.** Use `beeper send text --to <selector> --message <text>`, not `beeper send "..." --chat ...`. Same applies to `send file`, `send react`, `send sticker`, `send voice`.
 - **Use `accountID`, not `network`**, for any write action. `network` is a display label and changes.
-- **Download asset URLs promptly.** `srcURL` and avatar URLs may be temporary or local-only to the device.
+- **Download asset URLs promptly.** `srcURL` and avatar URLs (`mxc://`, `localmxc://`, `file://`) may be temporary or local-only to the device. Resolve via `assets.serve` / `assets.download`.
 - **Edits are text-only.** `PUT /v1/chats/{chatID}/messages/{messageID}` fails on messages with attachments.
 - **Rate limits return 429.** Back off on 429 and retry with jitter; the SDKs do this automatically when `maxRetries > 0`.
-- **iMessage quirk.** iMessage chats may not expose a stable `chatID` — the `get chat` endpoint warns about this. Use `localChatID` where available.
+- **iMessage quirk.** iMessage chats may not expose a stable `chatID`. Use `localChatID` where available.
 - **Cursor opacity.** Never inspect or mutate cursor strings. Pass them back verbatim with `direction`.
 - **Search is literal.** `query=` does literal word matching — NOT semantic search. All words must match.
