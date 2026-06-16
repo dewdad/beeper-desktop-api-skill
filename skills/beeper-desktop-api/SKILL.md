@@ -90,11 +90,15 @@ The same applies to SDK clients: construct `BeeperDesktop({ baseURL: 'http://127
 | Only chats that matter (unread, not muted, not low-priority) | `beeper chats list --target desktop --unread --no-muted --no-low-priority --json` |
 | Last N messages in one chat | `beeper messages list --target desktop --chat '<chatID>' --limit N --json` |
 | Search across all networks | `beeper messages search "<query>" --limit 20 --json` |
-| Realtime stream of new messages/chats | `beeper watch --target desktop --json` |
-| Send a text message | `beeper send text --target desktop --to '<chatID|title|search>' --message "Hi" --wait` |
+| Realtime stream of new messages/chats | `beeper watch --target desktop --json` ⚠️ may drop events — see "Realtime: prefer raw WS over `beeper watch`" |
+| Send a text message (markdown supported) | `beeper send text --target desktop --to '<chatID\|title\|search>' --message "**Hi**" --wait` |
+| Send a file with caption | `beeper send file --target desktop --to '<chatID>' --file ./photo.png --mime image/png --caption "look" --wait` |
+| Send a reaction | `beeper send react --target desktop --to '<chatID>' --id '<msgID>' --reaction "👍"` |
+| Reply to a message | `beeper send text --target desktop --to '<chatID>' --message "..." --reply-to '<msgID>' --wait` |
+| Edit a message (text-only) | `beeper messages edit --target desktop --chat '<chatID>' --id '<msgID>' --message "new text"` |
 | Raw HTTP escape hatch | `beeper api get /v1/info --target desktop` |
 
-> ⚠️ `beeper send` is a command **group**, not a verb. Use `beeper send text` / `send file` / `send react` / `send sticker` / `send voice`. The text variant requires `--to` and `--message` flags (no positional args). `--to` accepts a chatID, numeric local chat ID, exact title, or fuzzy search text; pair with `--pick N` to disambiguate. Add `--wait` to block until Desktop confirms the send (or it fails).
+> ⚠️ `beeper send` is a command **group**, not a verb. Use `beeper send text` / `send file` / `send react` / `send sticker` / `send voice`. The text variant requires `--to` and `--message` flags (no positional args). `--to` accepts a chatID, numeric local chat ID, exact title, or fuzzy search text; pair with `--pick N` to disambiguate. Add `--wait` to block until Desktop confirms the send (or it fails) — **without `--wait`, response `state` is `accepted` and the `message` field is empty (no message ID returned)**.
 
 There is **no** `beeper inbox` command. To build an "inbox view", combine `chats list --unread --no-muted` with a per-chat `messages list --limit N` loop:
 
@@ -107,6 +111,60 @@ beeper chats list --target desktop --unread --no-muted --no-low-priority --limit
         | jq -r '.data[] | "  [\(.timestamp)] \(.senderName // .senderID): \(.text // "<no text>")"'
     done
 ```
+
+### Realtime: prefer raw WS over `beeper watch`
+
+In tested versions (`@beeper/cli` ≥ 0.6.x against Beeper Desktop ≥ 4.2.x), `beeper watch` **silently drops domain events** even after a successful WebSocket handshake and `subscriptions.updated` ack. Symptom: stdout stays at 2 lines (`ready` + `subscriptions.updated`) and never emits `message.upserted` / `chat.upserted` while messages are flowing.
+
+The `subscriptions.updated` response carries a `"app": { "state": false }` field which appears to gate event delivery in the CLI but NOT in the underlying WebSocket. A direct WS connection to the same `ws://localhost:23373/v1/ws` with the same token receives events normally.
+
+**Workaround:** use a raw WebSocket client. The Node.js + Python examples in [references/websocket.md](references/websocket.md) work as documented:
+
+```js
+import WebSocket from 'ws';
+const ws = new WebSocket('ws://localhost:23373/v1/ws', {
+  headers: { Authorization: `Bearer ${process.env.BEEPER_ACCESS_TOKEN}` },
+});
+ws.on('message', (buf) => {
+  const evt = JSON.parse(buf.toString());
+  if (evt.type === 'ready')
+    ws.send(JSON.stringify({ type: 'subscriptions.set', requestID: 'r1', chatIDs: ['*'] }));
+  else if (evt.type === 'message.upserted')
+    for (const m of evt.entries ?? []) console.log(`[${m.senderName}] ${m.text}`);
+});
+```
+
+Confirmed in this skill's test suite (2026-06-16, Linux desktop target): same window, same token — raw WS captured 5 message events, `beeper watch --target desktop` captured 0.
+
+### Sending formatted text & files
+
+**Markdown in, HTML out.** `--message` (and the SDK `text` field on send) accepts **markdown**, NOT HTML. The server converts to HTML for storage and bridging:
+
+| Markdown input | Stored as |
+|---|---|
+| `**bold**` | `<strong>bold</strong>` |
+| `*italic*` or `_italic_` | `<em>italic</em>` |
+| `` `code` `` | `<code>code</code>` |
+| `~~strike~~` | `<del>strike</del>` |
+| `[label](https://...)` | `<a href="..." target="_blank" rel="noopener noreferrer">label</a>` |
+
+**Literal HTML input is escaped, NOT honored.** Sending `--message "<strong>x</strong>"` round-trips as `&lt;strong&gt;x&lt;/strong&gt;`. **Do NOT send HTML strings to write APIs.** Read responses ARE HTML — that asymmetry is by design (markdown for input, HTML for storage/display).
+
+**File attachments** (`beeper send file` / `messages.send` with `attachment`):
+
+```bash
+beeper send file --target desktop --to '<chatID>' --file ./photo.png \
+  --mime image/png --caption "..." --filename "alt-name.png" --wait
+```
+
+- `--caption` lands in the message's **`text`** field (not a separate "caption" field on the message itself — though `attachments[i].caption` may exist).
+- Message `type` adapts to the attachment kind: `FILE`, `IMAGE`, `VIDEO`, `AUDIO`, `STICKER`, etc. **Always check `m.type` when iterating** — agents that only check `type === "TEXT"` will miss attachments.
+- Without `--mime`, MIME detection is best-effort. `.txt` was classified as `application/octet-stream` (message `type: "FILE"`). `--mime image/png` correctly produced `type: "IMAGE"`. Pass `--mime` explicitly when reliability matters.
+- Each attachment carries `{ id, type, mimeType, fileName, fileSize, srcURL }`. `srcURL` is an `mxc://` URL with E2EE key material embedded as `?encryptedFileInfoJSON=...` (base64 JSON). Use `assets.serve` / `assets.download` to fetch — they handle decryption.
+- Max file size: **500 MB** per `--file` (per `beeper send file --help`).
+- `--wait` is more important on file sends than text — uploads take time and you need the resolved message ID.
+
+For multi-step uploads via the SDK (upload first, get `uploadID`, then reference it), see [references/endpoints-rest.md](references/endpoints-rest.md) under `/v1/assets/upload`.
 
 ### Field & content gotchas
 
@@ -179,3 +237,7 @@ Beeper publishes two unrelated developer surfaces that this skill does NOT cover
 - **`messages list` includes pseudo-messages.** Reactions (and likely other events) come back as rows with `type !== "TEXT"` and `isHidden: true`. Filter them out when treating the result as a message stream.
 - **Edit responses are stale.** The response from a successful edit returns the message in its **pre-edit** state. Re-read to confirm the new text; check `editedTimestamp` to detect edits.
 - **`linkedMessageID` is overloaded** — it's the reply parent for `type: "TEXT"` and the reaction target for `type: "REACTION"`. Always disambiguate by `type`.
+- **Send markdown, not HTML.** `--message` (and SDK `text`) accepts markdown. Sending HTML strings escapes the angle brackets. Read responses ARE HTML — that asymmetry is intentional.
+- **Without `--wait`, sends return no message ID.** Response `state` is `accepted`, `message` field is empty. Always pass `--wait` (CLI) / await the resolved promise (SDK) when you need the ID.
+- **`beeper watch` is unreliable as of CLI 0.6.x / Desktop 4.2.x.** Use a raw WebSocket connection (`ws://localhost:23373/v1/ws`) instead — see "Realtime" section.
+- **Message `type` is not just `TEXT` and `REACTION`.** `IMAGE`, `VIDEO`, `AUDIO`, `FILE`, `STICKER`, … all appear in `messages list`. Filter accordingly.
