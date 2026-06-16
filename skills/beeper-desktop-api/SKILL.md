@@ -1,6 +1,6 @@
 ---
 name: beeper-desktop-api
-description: Complete reference for the Beeper Desktop API — a local HTTP + WebSocket + MCP server exposed by Beeper Desktop that lets code read, search, send, edit, react to, and stream messages across WhatsApp, iMessage, Telegram, Signal, Twitter/X, Discord, and every other network connected to the Beeper client. Use this skill whenever the user asks to build against the Beeper Desktop API, wire up the Beeper MCP server, send or search messages across chat networks through Beeper, automate Beeper Desktop, use @beeper/desktop-api (TS), beeper_desktop_api (Python), or github.com/beeper/desktop-api-go, subscribe to realtime message events via ws://localhost:23373/v1/ws, upload/download attachments via the Beeper assets endpoints, or integrate Beeper into an agent/script.
+description: Complete reference for the Beeper Desktop API — a local HTTP + WebSocket + MCP server exposed by Beeper Desktop that lets code read, search, send, edit, react to, and stream messages across WhatsApp, iMessage, Telegram, Signal, Twitter/X, Discord, and every other network connected to the Beeper client. Use this skill whenever the user asks to build against the Beeper Desktop API, wire up the Beeper MCP server, send or search messages across chat networks through Beeper, automate Beeper Desktop, use the official `beeper` / `@beeper/cli` command-line tool (commands like `beeper messages`, `beeper chats`, `beeper send`, `beeper api`, `beeper targets`, `beeper watch`, `beeper rpc`, `beeper status`, `beeper doctor`), use the SDKs (`@beeper/desktop-api` TS, `beeper_desktop_api` Python, `github.com/beeper/desktop-api-go`), subscribe to realtime message events via `ws://localhost:23373/v1/ws`, upload/download attachments via the Beeper assets endpoints, or integrate Beeper into an agent/script — including pointing the CLI at a running Beeper Desktop instance.
 ---
 
 # Beeper Desktop API
@@ -49,6 +49,22 @@ When a bearer token is passed to the MCP endpoints (`/v0/mcp`, `/v0/sse`), OAuth
 - **Asset URLs** — `mxc://...` (remote Matrix content), `localmxc://...` (local Beeper content), or `file://...`. Download via `POST /v1/assets/download` or stream directly via `GET /v1/assets/serve?url=...` (supports HTTP Range).
 - **Editing** — text-only. Messages with attachments cannot be edited.
 - **Versioning** — `/v1/*` is the current RESTful surface. `/v0/*` is gRPC-style and deprecated (breaking change in Beeper Desktop 4.1.294, 2025-10-16). Always prefer `/v1`.
+
+## CLI (`@beeper/cli`)
+
+The official `beeper` command-line tool is the cheapest, fastest path for shell-level automation, agents, and ad-hoc scripts on a workstation that already has Beeper Desktop installed and signed in. It wraps every endpoint listed below, returns `--json` envelopes, and supports multiple **targets** (a running Beeper Desktop on `:23373`, a CLI-managed Beeper Server on `:23374`, or a remote URL).
+
+```bash
+npm install -g @beeper/cli
+beeper status                                      # readiness + endpoint
+beeper accounts list --json                         # connected networks
+beeper messages search "invoice" --account whatsapp --limit 20 --json
+beeper send "Hi" --chat <selector>
+beeper watch --json                                 # realtime NDJSON stream
+beeper api get /v1/info                             # raw HTTP escape hatch
+```
+
+For the full command surface, the **runbook for pointing the CLI at a running Beeper Desktop** (including the `dataDir` fix and the manual `bdapi_*` token flow), known broken paths, and recipes — load **`references/cli.md`**. Whenever the user mentions `beeper` (the CLI), `beeper-cli`, `@beeper/cli`, or any `beeper <subcommand>`, that file is the canonical answer.
 
 ## SDKs
 
@@ -194,6 +210,7 @@ claude mcp add beeper http://localhost:23373/v0/mcp -t http -s user
 
 Load the relevant file for the task at hand:
 
+- **`references/cli.md`** — `@beeper/cli` (`beeper`) reference: targets model, auth resolution, full command surface, runbook for pointing the CLI at a running Beeper Desktop (with the Linux `dataDir` fix and the manual `bdapi_*` token flow), known broken paths, recipes. Load this whenever the user is using or asking about the `beeper` CLI.
 - **`references/endpoints-rest.md`** — every REST endpoint with full request/response schemas, path/query/body params, and curl examples. Load this whenever writing direct HTTP calls or needing exhaustive param detail.
 - **`references/sdk-typescript.md`** — `@beeper/desktop-api` complete method map, types, options, pagination, error classes.
 - **`references/sdk-python.md`** — `beeper_desktop_api` sync and async clients, every namespace/method.
