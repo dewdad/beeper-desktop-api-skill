@@ -90,7 +90,7 @@ The same applies to SDK clients: construct `BeeperDesktop({ baseURL: 'http://127
 | Only chats that matter (unread, not muted, not low-priority) | `beeper chats list --target desktop --unread --no-muted --no-low-priority --json` |
 | Last N messages in one chat | `beeper messages list --target desktop --chat '<chatID>' --limit N --json` |
 | Search across all networks | `beeper messages search "<query>" --limit 20 --json` |
-| Realtime stream of new messages/chats | `beeper watch --target desktop --json` ⚠️ may drop events — see "Realtime: prefer raw WS over `beeper watch`" |
+| Realtime stream of new messages/chats | ⚠️ `beeper watch --target desktop` ignores `--target` (bug). Use `BEEPER_ACCESS_TOKEN=<desktop-token> beeper watch --base-url http://127.0.0.1:23373 --json` — see "Realtime" section |
 | Send a text message (markdown supported) | `beeper send text --target desktop --to '<chatID\|title\|search>' --message "**Hi**" --wait` |
 | Send a file with caption | `beeper send file --target desktop --to '<chatID>' --file ./photo.png --mime image/png --caption "look" --wait` |
 | Send a reaction | `beeper send react --target desktop --to '<chatID>' --id '<msgID>' --reaction "👍"` |
@@ -112,29 +112,34 @@ beeper chats list --target desktop --unread --no-muted --no-low-priority --limit
     done
 ```
 
-### Realtime: prefer raw WS over `beeper watch`
+### Realtime: `beeper watch` `--target` is broken — use `--base-url`
 
-In tested versions (`@beeper/cli` ≥ 0.6.x against Beeper Desktop ≥ 4.2.x), `beeper watch` **silently drops domain events** even after a successful WebSocket handshake and `subscriptions.updated` ack. Symptom: stdout stays at 2 lines (`ready` + `subscriptions.updated`) and never emits `message.upserted` / `chat.upserted` while messages are flowing.
+In `@beeper/cli` ≥ 0.6.x, **`beeper watch` ignores the `-t` / `--target` flag**. It only honors `--base-url`. If you have both a `desktop` target (`:23373`, signed-in user) AND a `beeper-server` target (`:23374`, often `initializing`), `beeper watch --target desktop` silently falls through to the default target (beeper-server) and you'll see the WS handshake (`ready` + `subscriptions.updated`) but **zero domain events**, because beeper-server has no real account data flowing yet.
 
-The `subscriptions.updated` response carries a `"app": { "state": false }` field which appears to gate event delivery in the CLI but NOT in the underlying WebSocket. A direct WS connection to the same `ws://localhost:23373/v1/ws` with the same token receives events normally.
+**Symptom:** stdout stays at 2 lines (`ready` + `subscriptions.updated` — note `"app": { "state": false }`) and never emits `message.upserted` / `chat.upserted` while messages are flowing.
 
-**Workaround:** use a raw WebSocket client. The Node.js + Python examples in [references/websocket.md](references/websocket.md) work as documented:
+**Diagnosis** (one-liner): strace reveals the WS connection going to the wrong port:
 
-```js
-import WebSocket from 'ws';
-const ws = new WebSocket('ws://localhost:23373/v1/ws', {
-  headers: { Authorization: `Bearer ${process.env.BEEPER_ACCESS_TOKEN}` },
-});
-ws.on('message', (buf) => {
-  const evt = JSON.parse(buf.toString());
-  if (evt.type === 'ready')
-    ws.send(JSON.stringify({ type: 'subscriptions.set', requestID: 'r1', chatIDs: ['*'] }));
-  else if (evt.type === 'message.upserted')
-    for (const m of evt.entries ?? []) console.log(`[${m.senderName}] ${m.text}`);
-});
+```
+GET /v1/ws HTTP/1.1
+Host: 127.0.0.1:23374       ← wrong! Should be :23373 with --target desktop
+Authorization: Bearer syt_…  ← beeper-server token, not desktop bdapi_… token
 ```
 
-Confirmed in this skill's test suite (2026-06-16, Linux desktop target): same window, same token — raw WS captured 5 message events, `beeper watch --target desktop` captured 0.
+**Workaround:** bypass `--target` by passing `--base-url` + the desktop token via env var:
+
+```bash
+DESKTOP_TOKEN=$(jq -r .auth.accessToken ~/.beeper/targets/desktop.json)
+BEEPER_ACCESS_TOKEN="$DESKTOP_TOKEN" beeper watch \
+  --base-url http://127.0.0.1:23373 \
+  --json
+```
+
+This delivers events as expected. Confirmed in this skill's test suite (2026-06-16): same connection mode → 4 domain events received in 7 seconds while messages were flowing.
+
+**Or** drop down to a raw WebSocket client (also works — see [references/websocket.md](references/websocket.md) for Node/Python examples). Use that path if you want webhook semantics, custom filtering, or are already in a long-running script.
+
+**Note**: Other CLI commands (`chats list`, `messages list/send`, etc.) honor `--target` correctly. The bug is specific to `beeper watch`.
 
 ### Sending formatted text & files
 
@@ -239,5 +244,5 @@ Beeper publishes two unrelated developer surfaces that this skill does NOT cover
 - **`linkedMessageID` is overloaded** — it's the reply parent for `type: "TEXT"` and the reaction target for `type: "REACTION"`. Always disambiguate by `type`.
 - **Send markdown, not HTML.** `--message` (and SDK `text`) accepts markdown. Sending HTML strings escapes the angle brackets. Read responses ARE HTML — that asymmetry is intentional.
 - **Without `--wait`, sends return no message ID.** Response `state` is `accepted`, `message` field is empty. Always pass `--wait` (CLI) / await the resolved promise (SDK) when you need the ID.
-- **`beeper watch` is unreliable as of CLI 0.6.x / Desktop 4.2.x.** Use a raw WebSocket connection (`ws://localhost:23373/v1/ws`) instead — see "Realtime" section.
+- **`beeper watch` ignores `--target` (bug, CLI 0.6.x).** It only respects `--base-url`. Use `BEEPER_ACCESS_TOKEN=<token> beeper watch --base-url http://127.0.0.1:23373 --json`, or drop to a raw WebSocket. Other CLI commands honor `--target` correctly — the bug is `watch`-specific. See "Realtime" section.
 - **Message `type` is not just `TEXT` and `REACTION`.** `IMAGE`, `VIDEO`, `AUDIO`, `FILE`, `STICKER`, … all appear in `messages list`. Filter accordingly.
