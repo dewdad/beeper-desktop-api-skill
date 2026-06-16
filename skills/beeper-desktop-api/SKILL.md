@@ -110,11 +110,20 @@ beeper chats list --target desktop --unread --no-muted --no-low-priority --limit
 
 ### Field & content gotchas
 
-- **Message text may contain HTML.** WhatsApp news/broadcast channels (and some Matrix bridges) deliver messages with `<strong>`, `<br>`, `<a href="...">`, and HTML entities (`&gt;`, `&amp;`). Strip with `bleach`, `html2text`, or a simple regex before plaintext display.
+- **Message text may contain HTML.** WhatsApp news/broadcast channels AND Matrix bridges deliver messages with `<strong>`, `<br>`, `<a href="...">`, and HTML entities (`&gt;`, `&amp;`). Strip with `bleach`, `html2text`, or a simple regex before plaintext display.
+- **`text` can be empty string or `null`.** Attachment-only messages (image/voice/file with no caption) have no text. Treat empty text as a valid non-error state.
 - **`senderName` is optional.** Always fall back to `senderID` (e.g. `m.senderName or m.senderID` / `m.senderName ?? m.senderID`). Bridge bots like `@whatsappbot:beeper.local` often appear as the sender for broadcast channels.
 - **`chatID` may be missing on iMessage.** Use `localChatID` when present.
 - **Chat sort order.** `chats list` returns chats sorted by `lastActivity` descending — first item is the most recently active.
 - **Filter flags exist for noise reduction** (often missed): `--unread`, `--no-muted`, `--no-low-priority`, `--no-archived`, `--pinned`, `--account <id|network|bridge>`. Combine them.
+- **`messages list` returns event pseudo-messages.** Reactions appear as full message rows with `type: "REACTION"`, `text: null`, `isHidden: true`, and `linkedMessageID` pointing at the real message. **Filter `m.type === "TEXT"` (or check `!m.isHidden`) when iterating, or you'll mistake reactions for messages.** The same pattern likely applies to other event types (joins, kicks, pins).
+- **`linkedMessageID` is overloaded by `type`:**
+  - `type: "TEXT"` + `linkedMessageID` → this message is a **reply** to that ID
+  - `type: "REACTION"` + `linkedMessageID` → this is a **reaction** to that ID
+- **Naming asymmetry: reply field.** CLI flag is `--reply-to <msgID>`; SDK/REST request field is `replyToMessageID`; **response field is `linkedMessageID`** (not `replyToMessageID`). All three refer to the same thing.
+- **Edit responses are stale.** `messages edit` / `PUT /v1/chats/{chatID}/messages/{messageID}` returns `success: true` plus the message in its **pre-edit** state. To confirm the new text, re-read via `messages show` / `messages list`. Edited messages gain an `editedTimestamp` field.
+- **`sendStatus` is inconsistent across networks.** Present on Google Chat send responses; absent on Telegram/Matrix. Don't depend on it for delivery confirmation — use `--wait` (CLI) or poll `messages show` if you need certainty.
+- **Search is literal CONTIGUOUS SUBSTRING**, not multi-word bag-of-words. `messages search "hello CLI"` will NOT match a message containing `"hello from CLI"` — only messages containing the exact substring `"hello CLI"`. To find messages with multiple terms, query each separately and intersect, or use the unique tokens that actually appear contiguously in your target text.
 
 ## Key concepts (routing essentials only)
 
@@ -166,4 +175,7 @@ Beeper publishes two unrelated developer surfaces that this skill does NOT cover
 - **Rate limits return 429.** Back off on 429 and retry with jitter; the SDKs do this automatically when `maxRetries > 0`.
 - **iMessage quirk.** iMessage chats may not expose a stable `chatID`. Use `localChatID` where available.
 - **Cursor opacity.** Never inspect or mutate cursor strings. Pass them back verbatim with `direction`.
-- **Search is literal.** `query=` does literal word matching — NOT semantic search. All words must match.
+- **Search is literal CONTIGUOUS SUBSTRING.** `messages search "foo bar"` matches only messages containing the exact substring `"foo bar"`, NOT "messages containing both foo and bar somewhere". Not semantic, not bag-of-words. Use unique tokens that actually appear next to each other in your target text.
+- **`messages list` includes pseudo-messages.** Reactions (and likely other events) come back as rows with `type !== "TEXT"` and `isHidden: true`. Filter them out when treating the result as a message stream.
+- **Edit responses are stale.** The response from a successful edit returns the message in its **pre-edit** state. Re-read to confirm the new text; check `editedTimestamp` to detect edits.
+- **`linkedMessageID` is overloaded** — it's the reply parent for `type: "TEXT"` and the reaction target for `type: "REACTION"`. Always disambiguate by `type`.
