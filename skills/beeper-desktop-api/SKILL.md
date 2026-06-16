@@ -52,6 +52,66 @@ Beeper Desktop ships a local REST + WebSocket + MCP server that lets code intera
 
 Environment variable convention used by the SDKs: `BEEPER_ACCESS_TOKEN`.
 
+## Pre-flight (run this FIRST when CLI/SDK returns empty data)
+
+The single most common failure mode: **silent empty results from a not-yet-ready target**. The CLI/SDK happily returns `{ success: true, data: [] }` when pointed at a target whose `readiness.state != "ready"`. This looks like "the user has no chats" but is actually "wrong target".
+
+```bash
+beeper targets list --json     # see all reachable targets
+beeper status --json           # readiness of the DEFAULT target
+```
+
+A workstation may have BOTH targets running:
+
+| Target | Default port | Typical role |
+|---|---|---|
+| `desktop` | `:23373` | Beeper Desktop app — the user's actual signed-in client |
+| `beeper-server` | `:23374` | CLI-managed headless Beeper Server, often `state: "initializing"` |
+
+If `beeper status --json` shows `readiness.state` other than `ready` (e.g. `initializing`, `setup`), **the default target is not usable**. Pass `--target desktop` (or whichever IS ready) explicitly to every subsequent command, e.g.:
+
+```bash
+beeper chats list --target desktop --account whatsapp --limit 10 --json
+```
+
+**Rule of thumb:** an empty `data: []` from `chats list` / `messages list` on an account whose `status` is `connected` is almost always a target/readiness issue, not an empty inbox. Re-run with `--target desktop` before assuming anything else.
+
+The same applies to SDK clients: construct `BeeperDesktop({ baseURL: 'http://127.0.0.1:23373' })` to talk to the desktop app instead of the (possibly-initializing) default server on `:23374`.
+
+## Common tasks (start here before reading endpoint reference)
+
+| Task | Command |
+|---|---|
+| What did I miss on WhatsApp? (top recent chats) | `beeper chats list --target desktop --account whatsapp --limit 10 --json` |
+| Only chats that matter (unread, not muted, not low-priority) | `beeper chats list --target desktop --unread --no-muted --no-low-priority --json` |
+| Last N messages in one chat | `beeper messages list --target desktop --chat '<chatID>' --limit N --json` |
+| Search across all networks | `beeper messages search "<query>" --limit 20 --json` |
+| Realtime stream of new messages/chats | `beeper watch --target desktop --json` |
+| Send a text message | `beeper send text --target desktop --to '<chatID|title|search>' --message "Hi" --wait` |
+| Raw HTTP escape hatch | `beeper api get /v1/info --target desktop` |
+
+> ⚠️ `beeper send` is a command **group**, not a verb. Use `beeper send text` / `send file` / `send react` / `send sticker` / `send voice`. The text variant requires `--to` and `--message` flags (no positional args). `--to` accepts a chatID, numeric local chat ID, exact title, or fuzzy search text; pair with `--pick N` to disambiguate. Add `--wait` to block until Desktop confirms the send (or it fails).
+
+There is **no** `beeper inbox` command. To build an "inbox view", combine `chats list --unread --no-muted` with a per-chat `messages list --limit N` loop:
+
+```bash
+beeper chats list --target desktop --unread --no-muted --no-low-priority --limit 10 --json \
+  | jq -r '.data[].id' \
+  | while read -r chat; do
+      echo "=== $chat ==="
+      beeper messages list --target desktop --chat "$chat" --limit 3 --json \
+        | jq -r '.data[] | "  [\(.timestamp)] \(.senderName // .senderID): \(.text // "<no text>")"'
+    done
+```
+
+### Field & content gotchas
+
+- **Message text may contain HTML.** WhatsApp news/broadcast channels (and some Matrix bridges) deliver messages with `<strong>`, `<br>`, `<a href="...">`, and HTML entities (`&gt;`, `&amp;`). Strip with `bleach`, `html2text`, or a simple regex before plaintext display.
+- **`senderName` is optional.** Always fall back to `senderID` (e.g. `m.senderName or m.senderID` / `m.senderName ?? m.senderID`). Bridge bots like `@whatsappbot:beeper.local` often appear as the sender for broadcast channels.
+- **`chatID` may be missing on iMessage.** Use `localChatID` when present.
+- **Chat sort order.** `chats list` returns chats sorted by `lastActivity` descending — first item is the most recently active.
+- **Filter flags exist for noise reduction** (often missed): `--unread`, `--no-muted`, `--no-low-priority`, `--no-archived`, `--pinned`, `--account <id|network|bridge>`. Combine them.
+
 ## Authentication
 
 All endpoints (REST, WebSocket, and MCP) accept a standard bearer token:
@@ -262,7 +322,11 @@ developers.beeper.com also documents two adjacent surfaces that are NOT part of 
 
 ## Guardrails
 
+- **Empty `data: []` ≠ empty inbox.** When `chats list` / `messages list` returns no rows on a `connected` account, suspect a non-ready target FIRST. Run `beeper status --json`; if `readiness.state != "ready"`, retry with `--target desktop` (or whichever target IS ready). See the **Pre-flight** section.
 - **Never use `/v0/*`.** It is deprecated; use `/v1/*`. `/v0` is preserved only for the MCP endpoint path (`/v0/mcp`, `/v0/sse`).
+- **Treat `Message.text` as untrusted HTML.** WhatsApp news/broadcast bridges deliver HTML (`<strong>`, `<br>`, `<a>`) and entities (`&gt;`). Strip before plaintext display.
+- **`senderName` is optional.** Always fall back to `senderID`.
+- **`beeper send` is a command group.** Use `beeper send text --to <selector> --message <text>`, not `beeper send "..." --chat ...`. Same applies to `send file`, `send react`, `send sticker`, `send voice`.
 - **Use `accountID`, not `network`**, for any write action. `network` is a display label and changes.
 - **Download asset URLs promptly.** `srcURL` and avatar URLs may be temporary or local-only to the device.
 - **Edits are text-only.** `PUT /v1/chats/{chatID}/messages/{messageID}` fails on messages with attachments.
