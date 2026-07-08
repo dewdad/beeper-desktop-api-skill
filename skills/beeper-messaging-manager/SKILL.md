@@ -60,6 +60,14 @@ installer that wires them into whatever agent/OS you're on.
 python skills/beeper-messaging-manager/scripts/install.py
 ```
 
+> **Requirements:** Python **3.7+** with `venv` + `pip` (Debian/Ubuntu:
+> `sudo apt install python3-venv python3-pip`), the `beeper` CLI, and `jq`.
+> Use `python3` if `python` is unversioned. The installer version-gates itself
+> and prints exact install commands (per-OS) if Python is too old or missing —
+> it never crashes with a bare traceback. If `venv` can't be created it falls
+> back to your system interpreter when it already has `websockets`, else prints
+> the one command to finish.
+
 Re-runnable and idempotent. Useful flags:
 
 | Flag | Effect |
@@ -175,7 +183,11 @@ The installer does this automatically; to check by hand:
 
 ## Support files
 
-- `scripts/install.py` — the one-command, host-aware installer.
+- `scripts/install.py` — the one-command, host-aware installer (a Python-2-safe
+  version-gate launcher that delegates to `_installer_impl.py` on Python 3.7+,
+  so an old interpreter gets a helpful message, never a bare SyntaxError).
+- `scripts/_installer_impl.py` — the installer implementation (imported by the
+  launcher once the interpreter is known to be ≥ 3.7).
 - `scripts/test_matches.py` — re-runnable unit test of the alert match logic.
 - `templates/watcher.py` — the realtime WS alert daemon (portable).
 - `templates/digest.sh` — the ranked-unread collector.

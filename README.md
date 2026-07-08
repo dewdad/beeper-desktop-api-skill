@@ -147,7 +147,16 @@ beeper-desktop-api-skill/
 
 - Treat your `BEEPER_ACCESS_TOKEN` like an account credential. Anyone holding it can read and send messages on every network connected to your Beeper client.
 - Prefer per-client OAuth tokens (revocable individually under **Settings → Developers → Approved connections**) over sharing a single long-lived token.
-- The skill itself is plain Markdown — no executable code, no runtime side effects.
+- The `beeper-desktop-api` skill is plain Markdown — no executable code. The `beeper-messaging-manager` skill ships runnable scripts (`install.py`, `watcher.py`, `digest.sh`) — review them before running; the installer supports `--dry-run` to preview every action with zero side effects.
+
+## Requirements for the installer
+
+`beeper-messaging-manager/scripts/install.py` needs **Python 3.7+** with the
+`venv` and `pip` modules (on Debian/Ubuntu: `sudo apt install python3-venv
+python3-pip`), plus the `beeper` CLI and `jq`. Run it with `python3` if `python`
+is unversioned on your system. The installer version-gates itself and prints
+exact install commands if the interpreter is too old or missing modules — it
+will not crash with a bare traceback.
 
 ## License
 
@@ -159,9 +168,8 @@ This is an unofficial, community-maintained skill. It documents Beeper's public 
 
 ## Author
 
-Maintained by **Gabe Fletcher**.
+Maintained by **Avital Ben-Natan** ([@dewdad](https://github.com/dewdad)).
 
-- Twitter / X: [@gabefletcher](https://x.com/gabefletcher)
-- Substack: [Compounded Content](https://compoundedcontent.substack.com)
-
-If this skill saved you an hour of reading docs, a follow or a subscribe is the best way to say thanks.
+Builds on the upstream `beeper-desktop-api` skill by Gabe Fletcher; the
+`beeper-messaging-manager` skill (installer + standing automations) is added
+here.
