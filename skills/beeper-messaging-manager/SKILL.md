@@ -18,12 +18,12 @@ license: MIT
 compatibility: |
   Requires Beeper Desktop >= 4.1.169 with Settings -> Developers -> Beeper
   Desktop API enabled, plus the `beeper` CLI (@beeper/cli), `jq`, and Python
-  3.9+. Supervision auto-wires on Linux (systemd --user) and macOS (launchd);
+  3.11+. Supervision auto-wires on Linux (systemd --user) and macOS (launchd);
   Windows prints Task Scheduler steps. Digest scheduling auto-detects Hermes
   (cron tool) and OpenCode, and degrades to plain crontab instructions on a
   generic host.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   upstream: https://github.com/dewdad/beeper-desktop-api-skill
 ---
 
@@ -57,16 +57,17 @@ installer that wires them into whatever agent/OS you're on.
 ## Install (the fast path)
 
 ```bash
-python skills/beeper-messaging-manager/scripts/install.py
+python3 skills/beeper-messaging-manager/scripts/install.py
 ```
 
-> **Requirements:** Python **3.7+** with `venv` + `pip` (Debian/Ubuntu:
-> `sudo apt install python3-venv python3-pip`), the `beeper` CLI, and `jq`.
-> Use `python3` if `python` is unversioned. The installer version-gates itself
-> and prints exact install commands (per-OS) if Python is too old or missing —
-> it never crashes with a bare traceback. If `venv` can't be created it falls
-> back to your system interpreter when it already has `websockets`, else prints
-> the one command to finish.
+> **Requirements:** Python **3.11+** with `venv` + `pip` (Debian/Ubuntu:
+> `sudo apt install python3.12 python3.12-venv`), the `beeper` CLI, and `jq`.
+> Invoke with `python3` (or a versioned `python3.12`) — bare `python` may point
+> at an unsupported interpreter. The installer version-gates itself and prints
+> exact per-OS install commands if Python is too old or missing — it never
+> crashes with a bare traceback. If `venv` can't be created it falls back to
+> your system interpreter when it already has `websockets`, else prints the one
+> command to finish.
 
 Re-runnable and idempotent. Useful flags:
 
@@ -183,11 +184,8 @@ The installer does this automatically; to check by hand:
 
 ## Support files
 
-- `scripts/install.py` — the one-command, host-aware installer (a Python-2-safe
-  version-gate launcher that delegates to `_installer_impl.py` on Python 3.7+,
-  so an old interpreter gets a helpful message, never a bare SyntaxError).
-- `scripts/_installer_impl.py` — the installer implementation (imported by the
-  launcher once the interpreter is known to be ≥ 3.7).
+- `scripts/install.py` — the one-command, host-aware installer. Version-gates
+  to Python 3.11+ with a friendly per-OS message before doing anything.
 - `scripts/test_matches.py` — re-runnable unit test of the alert match logic.
 - `templates/watcher.py` — the realtime WS alert daemon (portable).
 - `templates/digest.sh` — the ranked-unread collector.

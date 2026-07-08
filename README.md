@@ -14,8 +14,8 @@ Load this skill into Claude Code, Cursor, Codex CLI, OpenCode, Gemini CLI, or an
 If you just want to **build against the API**, use the first skill. If you want your agent to **watch and digest your messages for you** with minimal setup, run the installer that ships with the second:
 
 ```bash
-python skills/beeper-messaging-manager/scripts/install.py --dry-run   # preview
-python skills/beeper-messaging-manager/scripts/install.py             # do it
+python3 skills/beeper-messaging-manager/scripts/install.py --dry-run   # preview
+python3 skills/beeper-messaging-manager/scripts/install.py             # do it
 ```
 
 The installer detects your OS (Linux/macOS/Windows) and host agent (Hermes/OpenCode/generic), verifies Beeper Desktop is reachable, materializes an isolated automation dir + venv, supervises the watcher (systemd/launchd), registers or prints the digest schedule, and self-tests the alert logic — automating what it can and printing exact manual steps for the rest. See its [SKILL.md](skills/beeper-messaging-manager/SKILL.md) for the full model.
@@ -151,12 +151,13 @@ beeper-desktop-api-skill/
 
 ## Requirements for the installer
 
-`beeper-messaging-manager/scripts/install.py` needs **Python 3.7+** with the
-`venv` and `pip` modules (on Debian/Ubuntu: `sudo apt install python3-venv
-python3-pip`), plus the `beeper` CLI and `jq`. Run it with `python3` if `python`
-is unversioned on your system. The installer version-gates itself and prints
-exact install commands if the interpreter is too old or missing modules — it
-will not crash with a bare traceback.
+`beeper-messaging-manager/scripts/install.py` needs **Python 3.11+** with the
+`venv` and `pip` modules (on Debian/Ubuntu: `sudo apt install python3.12
+python3.12-venv`), plus the `beeper` CLI and `jq`. Invoke it with `python3` (or
+a versioned `python3.12`) — bare `python` may resolve to an unsupported
+interpreter. The installer version-gates itself and prints exact per-OS install
+commands if the interpreter is too old or missing modules — it will not crash
+with a bare traceback.
 
 ## License
 
