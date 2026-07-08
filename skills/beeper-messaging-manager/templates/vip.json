@@ -1,0 +1,13 @@
+{
+  "_comment": "Edit to control instant alerts. The watcher re-reads this file on every event — no restart needed. Group chats never alert unless matched by vip_senders/vip_keywords below.",
+  "alert_all_dms": true,
+  "_alert_all_dms_help": "true = every 1:1 direct message (any network) fires an instant alert. Set false to alert ONLY on vip_senders/vip_keywords.",
+  "vip_senders": [],
+  "_vip_senders_help": "People whose messages ALWAYS alert, even in group chats. Case-insensitive substring match against senderName OR senderID. e.g. \"Mor Parag\", \"+15551234567\", \"boss\".",
+  "vip_keywords": [],
+  "_vip_keywords_help": "Words/phrases that trigger an alert in ANY chat (group or DM). Case-insensitive substring vs message text. UTF-8 (Hebrew, etc.) works. e.g. \"urgent\", \"invoice\", \"דחוף\".",
+  "mute_networks": [],
+  "_mute_networks_help": "network/accountID substrings to ignore for realtime alerts (the digest still covers them). e.g. [\"linkedin\", \"twitter\"].",
+  "mute_chats": [],
+  "_mute_chats_help": "chatIDs or exact titles to never alert on, even if a VIP posts there. Useful to silence one specific noisy group."
+}

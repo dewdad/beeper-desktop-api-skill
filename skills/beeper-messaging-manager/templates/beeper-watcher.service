@@ -1,0 +1,28 @@
+[Unit]
+Description=Beeper Desktop realtime alert watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__BASE_DIR__
+# '-' prefix = don't fail if the env file is absent (creds are optional at first boot)
+EnvironmentFile=-__BASE_DIR__/alert.env
+Environment=BEEPER_AUTOMATION_DIR=__BASE_DIR__
+ExecStart=__PYTHON__ __BASE_DIR__/watcher.py
+Restart=always
+RestartSec=5
+# Cap restart storms: >5 crashes in 60s -> back off instead of hammering.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Install]
+WantedBy=default.target
+
+# INSTALL (the bundled install.py does this for you):
+#   cp beeper-watcher.service ~/.config/systemd/user/
+#   loginctl enable-linger "$USER"                 # survive logout/reboot
+#   export XDG_RUNTIME_DIR=/run/user/$(id -u)      # if driving from a non-login shell
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now beeper-watcher.service
+#   systemctl --user status beeper-watcher.service # expect: active (running)
