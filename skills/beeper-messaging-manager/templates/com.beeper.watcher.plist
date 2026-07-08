@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd user agent for the Beeper realtime watcher (macOS).
+  The bundled install.py writes the filled-in copy to
+  ~/Library/LaunchAgents/com.beeper.watcher.plist and loads it with:
+      launchctl load  ~/Library/LaunchAgents/com.beeper.watcher.plist
+      launchctl list | grep com.beeper.watcher     # confirm it's running
+  To read delivery creds, the installer inlines BEEPER_ALERT_TG_* into
+  EnvironmentVariables below (launchd has no EnvironmentFile equivalent).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.beeper.watcher</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__PYTHON__</string>
+    <string>__BASE_DIR__/watcher.py</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>BEEPER_AUTOMATION_DIR</key>
+    <string>__BASE_DIR__</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>__BASE_DIR__</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>__BASE_DIR__/watcher.log</string>
+  <key>StandardErrorPath</key>
+  <string>__BASE_DIR__/watcher.log</string>
+</dict>
+</plist>

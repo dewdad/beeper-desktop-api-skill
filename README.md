@@ -4,7 +4,23 @@ Agent Skill that documents the **[Beeper Desktop API](https://developers.beeper.
 
 Load this skill into Claude Code, Cursor, Codex CLI, OpenCode, Gemini CLI, or any agent that speaks the [`SKILL.md` standard](https://skills.sh/docs) to get a senior engineer who already knows every endpoint, SDK method, WebSocket event, MCP setup flow, and deployment gotcha for the Beeper Desktop API.
 
-## What it covers
+## Two skills in this repo
+
+| Skill | What it's for |
+|---|---|
+| [`beeper-desktop-api`](skills/beeper-desktop-api/SKILL.md) | **Knowledge base.** Every REST endpoint, SDK (TS/Python/Go), WebSocket event, MCP setup, auth flow, and gotcha. Load it whenever you write code against the Beeper Desktop API. |
+| [`beeper-messaging-manager`](skills/beeper-messaging-manager/SKILL.md) | **Turnkey automation.** A one-command installer plus two standing automations that make your agent *manage* your messaging: a supervised realtime alert watcher and a 3×/day ranked digest. Builds on `beeper-desktop-api`. |
+
+If you just want to **build against the API**, use the first skill. If you want your agent to **watch and digest your messages for you** with minimal setup, run the installer that ships with the second:
+
+```bash
+python skills/beeper-messaging-manager/scripts/install.py --dry-run   # preview
+python skills/beeper-messaging-manager/scripts/install.py             # do it
+```
+
+The installer detects your OS (Linux/macOS/Windows) and host agent (Hermes/OpenCode/generic), verifies Beeper Desktop is reachable, materializes an isolated automation dir + venv, supervises the watcher (systemd/launchd), registers or prints the digest schedule, and self-tests the alert logic — automating what it can and printing exact manual steps for the rest. See its [SKILL.md](skills/beeper-messaging-manager/SKILL.md) for the full model.
+
+## What the API skill covers
 
 | Area | File |
 |---|---|
@@ -95,21 +111,34 @@ beeper-desktop-api-skill/
 ├── README.md                    # (this file)
 ├── LICENSE                      # MIT
 └── skills/
-    └── beeper-desktop-api/
-        ├── SKILL.md             # frontmatter + entry doc
-        └── references/          # progressive-disclosure reference library
-            ├── endpoints-rest.md
-            ├── sdk-typescript.md
-            ├── sdk-python.md
-            ├── sdk-go.md
-            ├── schemas.md
-            ├── websocket.md
-            ├── mcp-server.md
-            ├── authentication.md
-            ├── errors.md
-            ├── remote-access.md
-            ├── bridges-self-hosting.md
-            └── cookbook.md
+    ├── beeper-desktop-api/
+    │   ├── SKILL.md             # frontmatter + entry doc (the knowledge base)
+    │   └── references/          # progressive-disclosure reference library
+    │       ├── endpoints-rest.md
+    │       ├── sdk-typescript.md
+    │       ├── sdk-python.md
+    │       ├── sdk-go.md
+    │       ├── schemas.md
+    │       ├── websocket.md
+    │       ├── mcp-server.md
+    │       ├── authentication.md
+    │       ├── errors.md
+    │       ├── remote-access.md
+    │       ├── bridges-self-hosting.md
+    │       └── cookbook.md
+    └── beeper-messaging-manager/
+        ├── SKILL.md             # orchestration + supervision + install guide
+        ├── scripts/
+        │   ├── install.py       # one-command, host-aware installer
+        │   └── test_matches.py  # re-runnable alert-logic unit test
+        └── templates/
+            ├── watcher.py               # realtime WS alert daemon
+            ├── digest.sh                # ranked-unread collector
+            ├── digest_prompt.md         # reasoning prompt for the scheduled run
+            ├── vip.json                 # editable alert-tuning config
+            ├── alert.env                # delivery creds (Telegram / ALERT_CMD)
+            ├── beeper-watcher.service   # systemd --user unit (Linux)
+            └── com.beeper.watcher.plist # launchd agent (macOS)
 ```
 
 `SKILL.md` is the only file the `skills` CLI strictly requires. The `references/` files are loaded on demand by the agent whenever it needs deep detail on a specific area — the progressive-disclosure pattern keeps context lean.
