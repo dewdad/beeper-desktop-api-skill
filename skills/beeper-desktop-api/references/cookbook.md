@@ -18,6 +18,7 @@ export BEEPER_ACCESS_TOKEN="your_token_here"
 8. [Watch one chat via WebSocket (Node)](#8-watch-one-chat-via-websocket-node)
 9. [Send an image attachment (two-step curl)](#9-send-an-image-attachment-two-step-curl)
 10. [Paginate through all chats oldest → newest (Python)](#10-paginate-through-all-chats-oldest---newest-python)
+11. [Send a native poll to a supported chat (experimental)](#11-send-a-native-poll-to-a-supported-chat-experimental)
 
 ---
 
@@ -291,3 +292,21 @@ print(f"fetched {len(all_chats)} chats")
 ```
 
 **Output.** A `list` of every chat the authenticated user has access to, oldest first.
+
+---
+
+## 11. Send a native poll to a supported chat (experimental)
+
+The documented Desktop `/v1` writer does not expose polls even when the target
+advertises `capabilities.poll == 2`. Use the bundled dry-run-first helper only
+after resolving an exact room ID:
+
+```bash
+python3 scripts/send_poll.py \
+  '!exactRoomID:beeper.local' \
+  'Where should we meet?' \
+  'Office' 'Cafe' 'Online'
+```
+
+Review the payload, then follow [polls.md](polls.md) for credential separation,
+`--send`, event read-back verification, and native-client validation.

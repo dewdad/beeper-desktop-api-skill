@@ -30,13 +30,14 @@ The installer detects your OS (Linux/macOS/Windows) and host agent (Hermes/OpenC
 | `beeper_desktop_api` (Python SDK, sync + async) | [`references/sdk-python.md`](skills/beeper-desktop-api/references/sdk-python.md) |
 | `github.com/beeper/desktop-api-go` (Go SDK) | [`references/sdk-go.md`](skills/beeper-desktop-api/references/sdk-go.md) |
 | Shared object schemas (Account, Chat, Message, Attachment, Reaction, Participant) | [`references/schemas.md`](skills/beeper-desktop-api/references/schemas.md) |
+| Experimental native polls through Beeper-backed chats, with dry-run-first helper | [`references/polls.md`](skills/beeper-desktop-api/references/polls.md) |
 | Experimental WebSocket realtime events (`ws://localhost:23373/v1/ws`) | [`references/websocket.md`](skills/beeper-desktop-api/references/websocket.md) |
 | Built-in MCP server setup for Claude Desktop, Claude Code, Cursor, VS Code, Raycast, Windsurf, Warp, Codex, Gemini CLI | [`references/mcp-server.md`](skills/beeper-desktop-api/references/mcp-server.md) |
 | In-app token creation, OAuth 2.0 + PKCE, `/oauth/introspect`, MCP auth bypass | [`references/authentication.md`](skills/beeper-desktop-api/references/authentication.md) |
 | HTTP status codes, error envelope shape, SDK exception mapping, retry guidance | [`references/errors.md`](skills/beeper-desktop-api/references/errors.md) |
 | Remote access (Advanced Settings), `0.0.0.0` binding, `X-Forwarded-*` headers, Cloudflare Quick Tunnels + SSE caveat | [`references/remote-access.md`](skills/beeper-desktop-api/references/remote-access.md) |
 | `bbctl` (Beeper Bridge Manager) overview and official bridge identifier list | [`references/bridges-self-hosting.md`](skills/beeper-desktop-api/references/bridges-self-hosting.md) |
-| 10 end-to-end recipes: bulk DM, export chat to CSV, image attachment send, watch a chat via WebSocket, daily unread digest, etc. | [`references/cookbook.md`](skills/beeper-desktop-api/references/cookbook.md) |
+| 11 end-to-end recipes: bulk DM, export chat to CSV, image attachment and poll sends, watch a chat via WebSocket, daily unread digest, etc. | [`references/cookbook.md`](skills/beeper-desktop-api/references/cookbook.md) |
 
 ## Install
 
@@ -113,7 +114,7 @@ beeper-desktop-api-skill/
 └── skills/
     ├── beeper-desktop-api/
     │   ├── SKILL.md             # frontmatter + entry doc (the knowledge base)
-    │   └── references/          # progressive-disclosure reference library
+    │   ├── references/          # progressive-disclosure reference library
     │       ├── endpoints-rest.md
     │       ├── sdk-typescript.md
     │       ├── sdk-python.md
@@ -122,10 +123,13 @@ beeper-desktop-api-skill/
     │       ├── websocket.md
     │       ├── mcp-server.md
     │       ├── authentication.md
+    │       ├── polls.md
     │       ├── errors.md
     │       ├── remote-access.md
     │       ├── bridges-self-hosting.md
     │       └── cookbook.md
+    │   └── scripts/
+    │       └── send_poll.py        # experimental, dry-run-first poll helper
     └── beeper-messaging-manager/
         ├── SKILL.md             # orchestration + supervision + install guide
         ├── scripts/
@@ -147,7 +151,7 @@ beeper-desktop-api-skill/
 
 - Treat your `BEEPER_ACCESS_TOKEN` like an account credential. Anyone holding it can read and send messages on every network connected to your Beeper client.
 - Prefer per-client OAuth tokens (revocable individually under **Settings → Developers → Approved connections**) over sharing a single long-lived token.
-- The `beeper-desktop-api` skill is plain Markdown — no executable code. The `beeper-messaging-manager` skill ships runnable scripts (`install.py`, `watcher.py`, `digest.sh`) — review them before running; the installer supports `--dry-run` to preview every action with zero side effects.
+- The `beeper-desktop-api` skill includes an experimental `send_poll.py` helper. It is dry-run-only unless `--send` is supplied and reads Beeper's local Matrix session only with explicit `--allow-local-session`; review it before use. The `beeper-messaging-manager` skill also ships runnable scripts (`install.py`, `watcher.py`, `digest.sh`) — review them before running; its installer supports `--dry-run` to preview every action with zero side effects.
 
 ## Requirements for the installer
 
