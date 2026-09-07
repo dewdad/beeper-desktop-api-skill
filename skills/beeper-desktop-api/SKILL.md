@@ -2,11 +2,12 @@
 name: beeper-desktop-api
 description: |
   Local HTTP + WebSocket + MCP server exposed by Beeper Desktop for reading,
-  searching, sending, editing, reacting to, and streaming messages across
+  searching, sending, editing, reacting to, polling, and streaming messages across
   WhatsApp, iMessage, Telegram, Signal, Twitter/X, Discord, and every other
   network connected to the Beeper client. Use when the user asks to build
   against the Beeper Desktop API; wire up the Beeper MCP server; send or
-  search messages across chat networks through Beeper; automate Beeper
+  search messages across chat networks through Beeper; send native WhatsApp
+  or Matrix polls; automate Beeper
   Desktop; use the official `beeper` CLI / `@beeper/cli` (e.g. `beeper
   messages`, `beeper chats`, `beeper send`, `beeper targets`, `beeper watch`,
   `beeper rpc`); use the `@beeper/desktop-api`, `beeper_desktop_api`, or
@@ -22,9 +23,11 @@ compatibility: |
   `github.com/beeper/desktop-api-go` SDKs, plus the experimental WebSocket
   event stream and the built-in MCP server.
 metadata:
-  version: "1.2.0"
-  upstream: https://github.com/gfsaaser24/beeper-desktop-api-skill
+  version: "1.3.0"
+  upstream: https://github.com/dewdad/beeper-desktop-api-skill
   changelog: |
+    1.3.0 — Add an experimental, verified Matrix poll workaround for chats that
+            advertise native poll support, plus a dry-run-first Python helper.
     1.2.0 — Progressive disclosure: trimmed always-loaded SKILL.md from ~336
             to ~200 lines. Moved per-language Quick Start snippets, full REST
             endpoint table, deep Authentication, CLI overview, SDKs install
@@ -96,6 +99,7 @@ The same applies to SDK clients: construct `BeeperDesktop({ baseURL: 'http://127
 | Send a reaction | `beeper send react --target desktop --to '<chatID>' --id '<msgID>' --reaction "👍"` |
 | Reply to a message | `beeper send text --target desktop --to '<chatID>' --message "..." --reply-to '<msgID>' --wait` |
 | Edit a message (text-only) | `beeper messages edit --target desktop --chat '<chatID>' --id '<msgID>' --message "new text"` |
+| Send a native poll (experimental) | Load [references/polls.md](references/polls.md), dry-run `scripts/send_poll.py`, then use `--send` only after exact-room and capability checks |
 | Raw HTTP escape hatch | `beeper api get /v1/info --target desktop` |
 
 > ⚠️ `beeper send` is a command **group**, not a verb. Use `beeper send text` / `send file` / `send react` / `send sticker` / `send voice`. The text variant requires `--to` and `--message` flags (no positional args). `--to` accepts a chatID, numeric local chat ID, exact title, or fuzzy search text; pair with `--pick N` to disambiguate. Add `--wait` to block until Desktop confirms the send (or it fails) — **without `--wait`, response `state` is `accepted` and the `message` field is empty (no message ID returned)**.
@@ -220,6 +224,7 @@ Decide what you're doing, load the matching file FIRST, then write code:
 | Self-hosting bridges (`bbctl` / Beeper Bridge Manager, official bridge IDs) | [references/bridges-self-hosting.md](references/bridges-self-hosting.md) |
 | Recipe-shaped tasks (bulk DM, scrape to CSV, watch a chat, …) | [references/cookbook.md](references/cookbook.md) |
 | Decoding response field shapes (`Message`, `Chat`, `Account`, `Attachment`, …) | [references/schemas.md](references/schemas.md) |
+| Sending native polls to supported Beeper-backed chats (experimental Matrix workaround) | [references/polls.md](references/polls.md) |
 
 > **Default path on a workstation that already has Beeper Desktop signed in:** start with the CLI ([references/cli.md](references/cli.md)). It needs no SDK install, no token plumbing, and emits `--json` envelopes. Only drop down to an SDK or raw HTTP when the CLI doesn't expose the needed surface or you're embedding into a long-running process.
 
@@ -248,3 +253,4 @@ Beeper publishes two unrelated developer surfaces that this skill does NOT cover
 - **Without `--wait`, sends return no message ID.** Response `state` is `accepted`, `message` field is empty. Always pass `--wait` (CLI) / await the resolved promise (SDK) when you need the ID.
 - **`beeper watch` ignores `--target` (bug, CLI 0.6.x).** It only respects `--base-url`. Use `BEEPER_ACCESS_TOKEN=<token> beeper watch --base-url http://127.0.0.1:23373 --json`, or drop to a raw WebSocket. Other CLI commands honor `--target` correctly — the bug is `watch`-specific. See "Realtime" section.
 - **Message `type` is not just `TEXT` and `REACTION`.** `IMAGE`, `VIDEO`, `AUDIO`, `FILE`, `STICKER`, … all appear in `messages list`. Filter accordingly.
+- **Poll sending is experimental and bypasses `/v1`.** Require an exact room ID and `capabilities.poll == 2`; use the finalized `m.poll.start` shape and Matrix credentials, then read back the event. See [references/polls.md](references/polls.md).
